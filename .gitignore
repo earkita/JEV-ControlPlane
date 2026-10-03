@@ -6,3 +6,4 @@ __pycache__/
 benchmark-results/
 *.safetensors
 .env
+.venv-test/

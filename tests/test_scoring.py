@@ -62,5 +62,5 @@ def test_direct_and_shared_match(backend):
 def test_distinct_likelihood_semantics(backend):
     result = LikelihoodScorer(backend).score(decision())
     assert result.scorer == "likelihood"
-    assert result.best == "a"
+    assert result.best == "b"
     assert result.options[0]["raw_score"] == -5

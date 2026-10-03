@@ -15,10 +15,10 @@ def _decision(state, row):
         if isinstance(x, dict) else Option(x, x) for x in row["options"]])
 
 
-def _metrics(results, elapsed, model):
+def _metrics(results, elapsed, model, requests):
     latencies = sorted(r.timings["total_s"] for r in results)
     p95 = latencies[min(len(latencies)-1, int(0.95 * (len(latencies)-1)))]
-    return {"requests_per_s": len(results)/elapsed, "decisions_per_s": len(results)/elapsed,
+    return {"requests_per_s": requests/elapsed, "decisions_per_s": len(results)/elapsed,
             "latency_p50_s": statistics.median(latencies), "latency_p95_s": p95,
             "prefill_s": sum(r.timings.get("prefill_s", 0) for r in results),
             "shared_prefill_s": results[0].timings.get("shared_prefill_s", 0),
@@ -35,17 +35,23 @@ def bench(model, path, temperature=1.0):
         ("semif_direct", lambda: [SemIfScorer(model).score(d, temperature) for d in decisions]),
         ("semif_shared", lambda: score_shared(model, decisions, temperature)),
     ):
+        if hasattr(model, "torch") and str(model.device).startswith("cuda"):
+            model.torch.cuda.reset_peak_memory_stats(model.device)
         mark = time.perf_counter()
         results = runner()
         elapsed = time.perf_counter()-mark
-        report["runs"][name] = {**_metrics(results, elapsed, model), "choices": [r.best for r in results],
+        report["runs"][name] = {**_metrics(results, elapsed, model, 1 if name == "semif_shared" else len(results)), "choices": [r.best for r in results],
                                 "wall_s": elapsed}
+    direct = report["runs"]["semif_direct"]["choices"]
+    shared = report["runs"]["semif_shared"]["choices"]
+    report["shared_direct_agreement"] = sum(a == b for a, b in zip(direct, shared)) / len(direct)
     return report
 
 
 def evaluate(model, path, scorer="semif", temperature=1.0):
     engine = SemIfScorer(model) if scorer == "semif" else LikelihoodScorer(model)
     rows = [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
+    if not rows: raise ValueError("evaluation file is empty")
     results = [engine.score(_decision(row["state"], row), temperature) for row in rows]
     correct = sum(r.best == row["label"] for r, row in zip(results, rows))
     return {"model": model.model_name, "revision": model.model_revision, "scorer": scorer,

@@ -16,6 +16,13 @@ class Settings:
     host: str = "127.0.0.1"
     port: int = 8000
 
+    def __post_init__(self):
+        if self.backend != "torch": raise ValueError("backend must be torch")
+        if self.scorer not in ("semif", "likelihood"):
+            raise ValueError("scorer must be semif or likelihood")
+        if self.max_context < 2: raise ValueError("max_context must be >= 2")
+        if self.temperature <= 0: raise ValueError("temperature must be positive")
+
     @classmethod
     def from_env(cls, **overrides):
         values = {field: os.environ.get(field.upper()) for field in cls.__dataclass_fields__}
@@ -25,6 +32,4 @@ class Settings:
             if key in values: values[key] = int(values[key])
         if "temperature" in values: values["temperature"] = float(values["temperature"])
         result = cls(**values)
-        if result.max_context < 2: raise ValueError("max_context must be >= 2")
-        if result.temperature <= 0: raise ValueError("temperature must be positive")
         return result
