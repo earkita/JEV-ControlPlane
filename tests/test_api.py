@@ -35,3 +35,19 @@ def test_api_rejects_overlong_prompt(backend, settings):
             "options":["A", "B"]})
         assert response.status_code == 400
         assert "truncation disabled" in response.text
+
+
+def test_model_loads_once_across_requests(monkeypatch, backend, settings):
+    from openjev_semif.api import server
+    calls = []
+    def load(config):
+        calls.append(config)
+        return backend
+    monkeypatch.setattr(server, "create_backend", load)
+    with TestClient(server.create_app(settings)) as client:
+        assert client.get('/health').json()["status"] == "ready"
+        for _ in range(2):
+            response = client.post('/score', json={"state":"ok", "question":"Choose?",
+                "options":["first", "second"]})
+            assert response.status_code == 200
+    assert len(calls) == 1
