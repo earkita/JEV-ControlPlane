@@ -69,4 +69,16 @@ The backend protocol has `forward`, `prefill`, `get_last_logits`, and `sequence_
 
 The service lifecycle, `/score` and `/v1/systemone` typed API, and likelihood scoring are conceptually adapted from [daseinlabs/open-jev](https://github.com/daseinlabs/open-jev). Final-position option logits, strict answer-token validation, direct/shared modes, prompt hashing, reproducibility metadata, and temperature scaling are conceptually adapted from [TheoLeeCJ/SemIf-OpenJev](https://github.com/TheoLeeCJ/SemIf-OpenJev). This implementation was written as a new package; source directories, tests, benchmark datasets, model weights and demo assets were not copied. Both upstream projects use MIT; their copyright notices are retained in [LICENSE](LICENSE) and [LICENSE-SemIf](LICENSE-SemIf). Model weights remain subject to their own license.
 
-MLX, browser demos, training heads, chess/Doom examples, and publication-specific evaluations were left out of the service scope. The initial shared mode uses safe independent KV branches; a batched branch path can follow after direct/shared numerical equivalence is established on the target model.
+MLX, browser demos, training heads, chess/Doom examples, serial mode, and publication-specific evaluations were left out of the service scope. The initial shared mode uses safe independent KV branches; a batched branch path can follow after direct/shared numerical equivalence is established on the target model.
+
+## RTX 3090 benchmark
+
+The committed [report](benchmarks/qwen3.5-4b-rtx3090.json) uses Qwen3.5-4B revision `851bf6e...`, BF16, a 3435-token first prompt, three questions per state, and three repetitions. The shared prefix contained 3394 tokens. Times include tokenization and inference but exclude model startup. The bundled evaluation has two synthetic sanity cases; it is not a quality benchmark.
+
+| Mode | Requests/s | Decisions/s | p50 request latency | p95 request latency | Peak GPU memory |
+|---|---:|---:|---:|---:|---:|
+| Likelihood (shared context within each decision) | 1.00 | 1.00 | 0.895 s | 1.432 s | 9.52 GB |
+| SemIf direct | 1.25 | 1.25 | 0.800 s | 0.811 s | 9.37 GB |
+| SemIf shared | 1.06 | 3.18 | 0.942 s | 0.947 s | 9.52 GB |
+
+Direct and shared selected the same option in all three benchmark questions. The report also includes prefill and branch timings. Shared mode's request groups three decisions, so request throughput and decision throughput differ. Results depend on this workload and installed kernels; the run used PyTorch reference fallbacks for two Qwen kernels.

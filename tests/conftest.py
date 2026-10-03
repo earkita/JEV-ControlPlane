@@ -23,8 +23,9 @@ class FakeBackend:
         return scores
     def prefill(self, ids):
         self.prefill_calls += 1
-        return ids, len(ids)
+        return ids, len(ids), None
     def get_last_logits(self, cache, suffix): return self.forward(cache[0] + suffix)
+    def score_continuations(self, cache, continuations): return [-len(x) for x in continuations]
     def sequence_logprob(self, prefix, continuation): return -len(continuation)
 
 @pytest.fixture

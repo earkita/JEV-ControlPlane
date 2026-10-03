@@ -1,0 +1,67 @@
+{
+  "model": "Qwen/Qwen3.5-4B",
+  "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+  "input": "examples/bench-long.json",
+  "repeats": 3,
+  "state_characters": 16800,
+  "environment": {
+    "torch": "2.14.1+cu130",
+    "transformers": "5.18.0",
+    "device": "cuda",
+    "dtype": "bfloat16",
+    "gpu": "NVIDIA GeForce RTX 3090"
+  },
+  "runs": {
+    "likelihood": {
+      "requests_per_s": 1.0054318247652834,
+      "decisions_per_s": 1.0054318247652834,
+      "latency_p50_s": 0.8949134820140898,
+      "latency_p95_s": 1.4323507300228808,
+      "prefill_s": 7.500371814938262,
+      "shared_prefill_s": 0,
+      "branch_s": 0,
+      "gpu_peak_memory_bytes": 9517776896,
+      "choices": [
+        "The release notes",
+        "Temporarily disable the new kernel",
+        "Run the failing tests again"
+      ],
+      "wall_s": 8.951377685007174
+    },
+    "semif_direct": {
+      "requests_per_s": 1.2507472596512441,
+      "decisions_per_s": 1.2507472596512441,
+      "latency_p50_s": 0.8004302710178308,
+      "latency_p95_s": 0.8105977546307258,
+      "prefill_s": 7.003243319108151,
+      "shared_prefill_s": 0,
+      "branch_s": 0,
+      "gpu_peak_memory_bytes": 9371826176,
+      "choices": [
+        "The kernel error and logs",
+        "Temporarily disable the new kernel",
+        "Run the failing tests again"
+      ],
+      "wall_s": 7.195698355964851
+    },
+    "semif_shared": {
+      "requests_per_s": 1.0612740518992942,
+      "decisions_per_s": 3.1838221556978823,
+      "latency_p50_s": 0.9420966560137458,
+      "latency_p95_s": 0.9467921432165894,
+      "prefill_s": 0.0,
+      "shared_prefill_s": 2.3468709519365802,
+      "branch_s": 0.3551312149502337,
+      "gpu_peak_memory_bytes": 9523202048,
+      "choices": [
+        "The kernel error and logs",
+        "Temporarily disable the new kernel",
+        "Run the failing tests again"
+      ],
+      "wall_s": 2.8267910580034368
+    }
+  },
+  "input_tokens_first_question": 3435,
+  "shared_prefix_tokens": 3394,
+  "shared_direct_agreement": 1.0
+}

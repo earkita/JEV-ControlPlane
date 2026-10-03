@@ -27,7 +27,10 @@ class LikelihoodScorer:
             continuations.append(ids)
         tokenization = time.perf_counter()-started
         mark = time.perf_counter()
-        raw = [self.backend.sequence_logprob(prefix, ids) for ids in continuations]
+        cache = self.backend.prefill(prefix)
+        prefill = time.perf_counter()-mark
+        mark = time.perf_counter()
+        raw = self.backend.score_continuations(cache, continuations)
         scoring = time.perf_counter()-mark
         probs = probabilities(raw, temperature)
         best = max(range(len(probs)), key=probs.__getitem__)
@@ -41,6 +44,6 @@ class LikelihoodScorer:
             tokenizer_revision=self.backend.tokenizer_revision,
             prompt_hash=hashlib.sha256(text.encode()).hexdigest(), prompt_version="likelihood-v1",
             input_tokens=len(prefix), truncated=False, temperature=temperature,
-            timings={"tokenization_s": tokenization, "prefill_s": 0.0,
+            timings={"tokenization_s": tokenization, "prefill_s": prefill,
                      "scoring_s": scoring, "total_s": time.perf_counter()-started},
         )

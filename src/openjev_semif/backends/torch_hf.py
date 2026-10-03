@@ -64,14 +64,15 @@ class TorchHFBackend:
             if self._selective_logits: kwargs["logits_to_keep"] = 1
             out = self.model(**kwargs)
             cache = out.past_key_values
+            last = out.logits[0, -1].float().clone()
             self.synchronize()
             if cache is None: raise RuntimeError("model did not return KV cache")
             if hasattr(cache, "get_seq_length") and cache.get_seq_length() != len(ids):
                 raise RuntimeError("KV cache has incorrect prefix length")
-            return cache, len(ids)
+            return cache, len(ids), last
 
     def get_last_logits(self, cache, suffix):
-        base, prefix_length = cache
+        base, prefix_length, _ = cache
         branch = copy.deepcopy(base)
         with self.torch.inference_mode():
             kwargs = {
@@ -83,6 +84,31 @@ class TorchHFBackend:
             logits = self.model(**kwargs).logits[0, -1].float()
             self.synchronize()
             return logits.cpu().tolist()
+
+    def score_continuations(self, cache, continuations):
+        """Score all option texts from one context prefill and independent KV branches."""
+        base, prefix_length, last = cache
+        results = []
+        with self.torch.inference_mode():
+            first_log_probs = last.log_softmax(-1)
+            for continuation in continuations:
+                if not continuation: raise ValueError("empty option tokens")
+                score = first_log_probs[continuation[0]]
+                if len(continuation) > 1:
+                    branch = copy.deepcopy(base)
+                    inputs = self._tensor(continuation[:-1])
+                    attention = self.torch.ones((1, prefix_length + len(continuation)-1),
+                                                dtype=self.torch.long, device=self.device)
+                    logits = self.model(input_ids=inputs, attention_mask=attention,
+                                        past_key_values=branch, use_cache=True,
+                                        return_dict=True).logits[0].float()
+                    target = self.torch.tensor(continuation[1:], dtype=self.torch.long,
+                                               device=self.device)
+                    score = score + (logits.gather(-1, target[:, None]).squeeze(-1)
+                                     - logits.logsumexp(-1)).sum()
+                results.append(float(score.item()))
+            self.synchronize()
+        return results
 
     def sequence_logprob(self, prefix, continuation):
         if not prefix or not continuation: raise ValueError("prefix and continuation must contain tokens")

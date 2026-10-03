@@ -5,6 +5,7 @@ from openjev_semif.config import Settings
 from openjev_semif.backends.registry import create_backend
 from openjev_semif.scoring.base import Decision, Option
 from openjev_semif.scoring.semif import SemIfScorer
+from openjev_semif.scoring.likelihood import LikelihoodScorer
 from openjev_semif.runtime.shared_state import score_shared
 from openjev_semif.prompting.semif import encode, prompt
 from openjev_semif.api.server import create_app
@@ -25,6 +26,12 @@ def test_qwen_sanity_and_shared():
         Decision("A CUDA kernel test failed after a code change.", "Which action limits risk until fixed?",
                  [Option("rollback", "Disable the new kernel"), Option("ship", "Ship the failing kernel")]),
     ]
+    likelihood = LikelihoodScorer(model).score(rows[0])
+    text = f"State:\n{rows[0].state}\n\nQuestion:\n{rows[0].question}\n\nAnswer:\n"
+    prefix = model.tokenizer.encode(text, add_special_tokens=False)
+    for option, item in zip(rows[0].options, likelihood.options):
+        continuation = model.tokenizer.encode(option.description, add_special_tokens=False)
+        assert item["raw_score"] == pytest.approx(model.sequence_logprob(prefix, continuation), abs=0.1)
     direct = [SemIfScorer(model).score(x) for x in rows]
     shared = score_shared(model, rows)
     assert direct[0].best == "logs"

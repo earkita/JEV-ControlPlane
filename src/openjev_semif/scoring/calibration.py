@@ -20,7 +20,8 @@ def probabilities(scores: list[float], temperature: float = 1.0) -> list[float]:
 
 def confidence(probs: list[float]) -> float:
     """Normalized entropy concentration; not empirical correctness probability."""
-    return 1.0 + sum(p * math.log(p) for p in probs if p > 0) / math.log(len(probs))
+    value = 1.0 + sum(p * math.log(p) for p in probs if p > 0) / math.log(len(probs))
+    return max(0.0, min(1.0, value))
 
 @dataclass(frozen=True)
 class CalibrationProfile:

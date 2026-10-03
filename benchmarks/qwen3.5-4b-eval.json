@@ -1,0 +1,19 @@
+{
+  "model": "Qwen/Qwen3.5-4B",
+  "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+  "scorer": "semif",
+  "accuracy": 1.0,
+  "count": 2,
+  "predictions": [
+    {
+      "best": "Kernel logs",
+      "label": "Kernel logs",
+      "prompt_hash": "8ca44a5deb1d5bc26b5cd4971395ca9b1a7c7df2695ec3d81cdc6029f8d4d1b1"
+    },
+    {
+      "best": "Investigate the failing test",
+      "label": "Investigate the failing test",
+      "prompt_hash": "2acd56c02202e695f54fac4028dc7c88967618003e885b614adc0fd00d511ee0"
+    }
+  ]
+}
