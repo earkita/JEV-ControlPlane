@@ -8,3 +8,4 @@
 - Run `pytest -q` for CPU tests. Run `RUN_MODEL_INTEGRATION=1 pytest -q` only on a CUDA host with cached Qwen3.5-4B weights.
 - Benchmarks must state the exact model revision, hardware, dtype, prompt size, repetitions, and request versus decision throughput. Do not present synthetic sanity fixtures as quality evaluations.
 - Review upstream licenses and record attribution before adapting code. Do not commit model weights, caches, third-party datasets, secrets, or reference repositories.
+- Keep the web UI as a thin client of `/score` and `/v1/systemone`. Render user-supplied text with `textContent`, and do not load model weights in browser code.

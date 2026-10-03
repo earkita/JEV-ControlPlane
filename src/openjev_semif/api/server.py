@@ -2,7 +2,10 @@
 from __future__ import annotations
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI, HTTPException, Header
+from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from .schemas import (ScoreRequest, ScoreResponse, SystemOneRequest, SystemOneResponse,
                       HealthResponse, OptionIn)
 from .systemone import decision_for, answer_for
@@ -27,6 +30,16 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
         state["backend"] = None
 
     app = FastAPI(title="OpenJEV-SemIf", version="0.1.0", lifespan=lifespan)
+    web_dir = Path(__file__).resolve().parent.parent / "web"
+    app.mount("/ui/assets", StaticFiles(directory=web_dir), name="ui-assets")
+
+    @app.get("/", include_in_schema=False)
+    def home():
+        return RedirectResponse("/ui", status_code=302)
+
+    @app.get("/ui", include_in_schema=False)
+    def ui():
+        return FileResponse(web_dir / "index.html")
 
     def get_backend():
         if state["backend"] is None: raise HTTPException(503, "model loading")

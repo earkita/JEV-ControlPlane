@@ -43,6 +43,12 @@ curl -s localhost:8000/v1/systemone -H 'content-type: application/json' -d '{
 
 Use `"mode":"shared"` with at least two questions over the same state to prefill an exact token prefix once and branch independent KV caches. It is supported for SemIf only. The implementation checks that full token sequences actually share the state prefix. The default is direct mode. Prompts exceeding `max_context` fail clearly; no truncation occurs.
 
+## Web UI
+
+The server also serves a built-in decision workbench at **`http://127.0.0.1:8000/ui`** (or `/`). It has a single-decision form for `/score` and a multi-question form for `/v1/systemone`, including `choice`, `score`, and `noul` questions. Choose SemIf or likelihood, set temperature, and use direct or shared mode for multiple SemIf questions. Results show option distributions, confidence, timings, token counts, prompt hashes, and model revision; JSON can be copied or downloaded.
+
+The UI uses local HTML/CSS/JavaScript assets in `src/openjev_semif/web/`. It is served by the same FastAPI process and does not load a second model, need Gradio, or require a frontend build. The API documentation remains available at `/docs`. If `OPENJEV_API_KEY` protects `/v1/systemone`, enter the key in the UI's authorization field for that browser tab; it is not saved by the page.
+
 ## HTTP client
 
 `openjev-semif serve` hosts the API. The separate Python and CLI clients call that service **without loading a model in the client process**. `openjev-semif score` remains the local, in-process scorer.

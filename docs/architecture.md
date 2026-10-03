@@ -1,6 +1,6 @@
 # Architecture and limits
 
-A single `TorchHFBackend` owns one tokenizer and model for the server lifetime. `OpenJEVClient` is an HTTP-only caller and never constructs a backend. `ModelBackend` is the minimal scoring protocol: full final logits, KV prefill, KV branch final logits, continuation log probability, and synchronization. The scorers are independent of Qwen; the backend handles the Qwen3.5 text-only model class when its Hugging Face config is multimodal.
+A single `TorchHFBackend` owns one tokenizer and model for the server lifetime. `OpenJEVClient` is an HTTP-only caller and never constructs a backend. The static workbench at `/ui` calls the same endpoints from the browser; its assets are packaged with the Python wheel and served by FastAPI. `ModelBackend` is the minimal scoring protocol: full final logits, KV prefill, KV branch final logits, continuation log probability, and synchronization. The scorers are independent of Qwen; the backend handles the Qwen3.5 text-only model class when its Hugging Face config is multimodal.
 
 `SemIfScorer` renders the evidence, question and labelled descriptions, then reads only the final-position logits for verified answer tokens A–P. The tokenizer must encode each letter as one exact token at the answer boundary. It softmaxes the selected logits after optional temperature scaling. `LikelihoodScorer` renders a separate context and sums `log P(option token | previous tokens)` for the text of each option. Their raw scores have different meanings and should not be compared directly.
 

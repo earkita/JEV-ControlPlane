@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08131b">
+  <title>OpenJEV-SemIf · Decision workbench</title>
+  <link rel="stylesheet" href="/ui/assets/style.css">
+  <script src="/ui/assets/app.js" defer></script>
+</head>
+<body>
+  <div class="page-glow" aria-hidden="true"></div>
+  <div class="site-wrap">
+    <header class="topbar">
+      <a class="brand" href="/ui" aria-label="OpenJEV-SemIf — strona główna">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span><strong>OpenJEV</strong><em>/ SemIf</em></span>
+      </a>
+      <nav class="top-nav" aria-label="Nawigacja">
+        <a class="nav-active" href="/ui">Workbench</a>
+        <a href="/docs" target="_blank" rel="noopener">API docs <span aria-hidden="true">↗</span></a>
+      </nav>
+      <div class="connection" id="connection" role="status" aria-live="polite">
+        <span class="connection-dot" aria-hidden="true"></span><span id="connection-text">Łączenie…</span>
+        <button id="refresh-health" type="button" aria-label="Odśwież stan serwera" title="Odśwież stan serwera">↻</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <div class="intro-copy">
+          <p class="eyebrow"><span class="eyebrow-line"></span> LOCAL DECISION LAB <span class="edition">01 / CONTROL PLANE</span></p>
+          <h1 id="page-title">Od stanu <span>do decyzji.</span></h1>
+          <p class="intro-lede">Sprawdź, jak model ocenia zdefiniowane przez Ciebie opcje. Jeden prompt, rozkład prawdopodobieństw, pełny ślad wykonania.</p>
+        </div>
+        <div class="model-card" aria-label="Aktywny model">
+          <div class="model-card-head"><span class="overline">ACTIVE ENGINE</span><span class="pulse" aria-hidden="true"></span></div>
+          <strong id="model-name">Oczekiwanie na serwer</strong>
+          <span id="model-details">—</span>
+          <div class="model-card-foot"><span id="model-scorer">SCORER —</span><span>LOCAL INFERENCE</span></div>
+        </div>
+      </section>
+
+      <div class="workspace">
+        <form id="decision-form" class="editor-panel" novalidate>
+          <div class="panel-title-row">
+            <div><span class="overline">INPUT / 01</span><h2>Zbuduj decyzję</h2></div>
+            <button class="subtle-button" type="button" id="load-preset">↙ Wczytaj przykład</button>
+          </div>
+
+          <section class="form-section" aria-labelledby="state-heading">
+            <div class="section-heading"><span class="step">01</span><h3 id="state-heading">Stan</h3><span class="section-hint">Wspólna baza dla pytań</span></div>
+            <label class="field-label" for="state-input">Kontekst lub obserwacje</label>
+            <textarea id="state-input" class="textarea state-input" placeholder="Opisz sytuację, logi, historię lub stan agenta…" rows="6" required></textarea>
+            <label class="check-row"><input id="state-json" type="checkbox"><span>Interpretuj stan jako JSON</span></label>
+          </section>
+
+          <section class="form-section" aria-labelledby="questions-heading">
+            <div class="section-heading"><span class="step">02</span><h3 id="questions-heading">Pytania i opcje</h3></div>
+            <div class="tabs" role="tablist" aria-label="Tryb formularza">
+              <button id="tab-single" class="tab active" type="button" role="tab" aria-selected="true" aria-controls="panel-single">Jedna decyzja</button>
+              <button id="tab-batch" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-batch">Wiele pytań <span class="tab-tag">SystemOne</span></button>
+            </div>
+
+            <div id="panel-single" class="tab-panel" role="tabpanel" aria-labelledby="tab-single">
+              <label class="field-label" for="single-question">Pytanie</label>
+              <textarea id="single-question" class="textarea short-textarea" rows="2" placeholder="Co powinien zrobić agent?" required></textarea>
+              <div class="list-heading"><span class="field-label">Dostępne opcje</span><span class="mini-note">2–16 opcji</span></div>
+              <div id="single-options" class="option-list"></div>
+              <button id="add-single-option" class="add-button" type="button"><span aria-hidden="true">＋</span> Dodaj opcję</button>
+            </div>
+
+            <div id="panel-batch" class="tab-panel" role="tabpanel" aria-labelledby="tab-batch" hidden>
+              <p class="panel-note">Wszystkie pytania korzystają z tego samego stanu. Tryb shared wykonuje jeden prefill wspólnego prefiksu.</p>
+              <div id="question-list" class="question-list"></div>
+              <button id="add-question" class="add-button" type="button"><span aria-hidden="true">＋</span> Dodaj pytanie</button>
+            </div>
+          </section>
+
+          <section class="form-section settings-section" aria-labelledby="settings-heading">
+            <div class="section-heading"><span class="step">03</span><h3 id="settings-heading">Ustawienia</h3></div>
+            <div class="settings-grid">
+              <label class="field"><span class="field-label">Scorer</span>
+                <select id="scorer-input"><option value="semif">SemIf · logity liter</option><option value="likelihood">Likelihood · tekst opcji</option></select>
+              </label>
+              <label class="field"><span class="field-label">Temperatura</span>
+                <input id="temperature-input" type="number" min="0.01" step="0.05" value="1.00" inputmode="decimal">
+              </label>
+              <label id="mode-field" class="field mode-field" hidden><span class="field-label">Tryb pytań</span>
+                <select id="mode-input"><option value="direct">Direct</option><option value="shared">Shared KV</option></select>
+              </label>
+            </div>
+            <p id="scorer-help" class="settings-note">SemIf porównuje logity liter A/B/C w ostatniej pozycji. Prawdopodobieństwa dotyczą tylko wyświetlonych opcji.</p>
+            <details class="advanced"><summary>Autoryzacja API <span aria-hidden="true">⌄</span></summary>
+              <label class="field-label" for="api-key">Klucz Bearer dla /v1/systemone</label>
+              <input id="api-key" type="password" autocomplete="off" placeholder="Opcjonalnie · pozostaje w tej karcie">
+            </details>
+          </section>
+
+          <div class="action-area">
+            <button id="run-button" class="run-button" type="submit"><span class="run-symbol" aria-hidden="true">↗</span><span id="run-label">Oceń decyzję</span></button>
+            <span class="action-hint">Model nie generuje odpowiedzi tekstowej.</span>
+          </div>
+        </form>
+
+        <aside class="output-panel" aria-labelledby="output-heading">
+          <div class="panel-title-row output-title-row">
+            <div><span class="overline">OUTPUT / 02</span><h2 id="output-heading">Wynik</h2></div>
+            <span class="output-badge" id="output-badge">AWAITING INPUT</span>
+          </div>
+          <div id="error-box" class="error-box" role="alert" hidden></div>
+          <div id="result-empty" class="result-empty">
+            <div class="empty-orbit" aria-hidden="true"><span class="orbit-ring ring-one"></span><span class="orbit-ring ring-two"></span><span class="orbit-core">◇</span></div>
+            <span class="empty-kicker">READY WHEN YOU ARE</span>
+            <h3>Decyzja zaczyna się tutaj.</h3>
+            <p>Uzupełnij stan, pytanie i opcje, a potem uruchom scoring. Zobaczysz rozkład, pewność i metryki wykonania.</p>
+          </div>
+          <div id="result-content" class="result-content" aria-live="polite" hidden></div>
+          <div id="result-actions" class="result-actions" hidden>
+            <button id="copy-json" type="button" class="subtle-button">Kopiuj JSON</button>
+            <button id="download-json" type="button" class="subtle-button">Pobierz wynik ↧</button>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="footer"><span>OpenJEV-SemIf · local-first decision scoring</span><span>API <a href="/docs" target="_blank" rel="noopener">/docs</a> <span class="footer-sep">·</span> HEALTH <a href="/health" target="_blank" rel="noopener">/health</a></span></footer>
+    </main>
+  </div>
+
+  <template id="option-template">
+    <div class="option-row">
+      <span class="option-letter" aria-hidden="true">A</span>
+      <label class="option-id-field"><span class="sr-only">ID opcji</span><input class="option-id" type="text" placeholder="id" autocomplete="off"></label>
+      <label class="option-description-field"><span class="sr-only">Opis opcji</span><input class="option-description" type="text" placeholder="Opis opcji" autocomplete="off"></label>
+      <button class="icon-button remove-option" type="button" aria-label="Usuń opcję" title="Usuń opcję">×</button>
+    </div>
+  </template>
+  <template id="question-template">
+    <article class="question-card">
+      <div class="question-card-top"><span class="question-number">QUESTION 01</span><button class="icon-button remove-question" type="button" aria-label="Usuń pytanie" title="Usuń pytanie">×</button></div>
+      <div class="question-settings">
+        <label class="field"><span class="field-label">ID pytania</span><input class="question-id" type="text" placeholder="next_action" autocomplete="off"></label>
+        <label class="field"><span class="field-label">Typ</span><select class="question-type"><option value="choice">Choice</option><option value="score">Score</option><option value="noul">Noul · tak/nie</option></select></label>
+      </div>
+      <label class="field"><span class="field-label">Instrukcja</span><textarea class="textarea question-instructions" rows="2" placeholder="Co powinien zrobić agent?"></textarea></label>
+      <div class="question-options"><div class="list-heading"><span class="field-label">Opcje / kryteria</span><span class="mini-note">2–16</span></div><div class="option-list"></div><button class="add-button add-question-option" type="button">＋ Dodaj opcję</button></div>
+      <div class="noul-criteria" hidden>
+        <label class="field"><span class="field-label">Prawda, gdy</span><input class="noul-true" type="text" placeholder="Warunek dla tak"></label>
+        <label class="field"><span class="field-label">Fałsz, gdy</span><input class="noul-false" type="text" placeholder="Warunek dla nie"></label>
+      </div>
+    </article>
+  </template>
+</body>
+</html>
