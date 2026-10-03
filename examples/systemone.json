@@ -1,0 +1,14 @@
+{
+  "state": "Build failed after enabling a new MXFP4 kernel.",
+  "questions": {
+    "next_action": {
+      "type": "choice",
+      "instructions": "What should the agent do next?",
+      "criteria": {
+        "debug": "Inspect the failing kernel and logs",
+        "rollback": "Disable the optimization",
+        "retest": "Run the tests again"
+      }
+    }
+  }
+}

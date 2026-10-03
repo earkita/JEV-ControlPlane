@@ -10,6 +10,7 @@ from openjev_semif.runtime.shared_state import score_shared
 from openjev_semif.prompting.semif import encode, prompt
 from openjev_semif.api.server import create_app
 from fastapi.testclient import TestClient
+from openjev_semif.client import OpenJEVClient
 
 @pytest.mark.skipif(os.getenv("RUN_MODEL_INTEGRATION") != "1", reason="set RUN_MODEL_INTEGRATION=1")
 def test_qwen_sanity_and_shared():
@@ -38,7 +39,8 @@ def test_qwen_sanity_and_shared():
     assert direct[1].best == "retest"
     assert direct[2].best == "rollback"
     with TestClient(create_app(Settings(), model)) as client:
-        assert client.get("/health").json()["status"] == "ready"
+        with OpenJEVClient(session=client) as remote:
+            assert remote.health().status == "ready"
         assert client.post("/score", json={"state": rows[0].state, "question": rows[0].question,
             "options": [{"id": x.id, "description": x.description} for x in rows[0].options]}).json()["best"] == "logs"
         system = client.post("/v1/systemone", json={"state": rows[0].state,

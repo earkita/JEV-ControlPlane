@@ -52,3 +52,85 @@ class HealthResponse(BaseModel):
     scorer: str
     status: Literal["ready", "loading"]
     model_revision: str | None = None
+
+class OptionScoreOut(BaseModel):
+    option: str
+    description: str
+    raw_score: float
+    probability: float
+    n_tokens: int | None = None
+
+class ScoreResponse(BaseModel):
+    best: str
+    best_index: int
+    options: list[OptionScoreOut]
+    confidence: float
+    scorer: Literal["semif", "likelihood"]
+    model: str
+    model_revision: str
+    tokenizer_revision: str
+    prompt_hash: str
+    prompt_version: str
+    input_tokens: int
+    truncated: bool
+    temperature: float
+    timings: dict[str, float]
+    mode: Literal["direct", "shared"]
+
+class ChoiceAnswerOut(BaseModel):
+    type: Literal["choice"]
+    choice: str
+    probabilities: dict[str, float]
+    confidence: float
+    timings: dict[str, float]
+    scorer: str
+    model_revision: str
+    tokenizer_revision: str
+    prompt_hash: str
+    input_tokens: int
+    temperature: float
+    truncated: bool
+    mode: str
+
+class ScoreAnswerOut(BaseModel):
+    type: Literal["score"]
+    score: float
+    legend: dict[str, Any]
+    probabilities: dict[str, float]
+    confidence: float
+    timings: dict[str, float]
+    scorer: str
+    model_revision: str
+    tokenizer_revision: str
+    prompt_hash: str
+    input_tokens: int
+    temperature: float
+    truncated: bool
+    mode: str
+
+class NoulAnswerOut(BaseModel):
+    type: Literal["noul"]
+    noul: float
+    probabilities: dict[str, float]
+    confidence: float
+    timings: dict[str, float]
+    scorer: str
+    model_revision: str
+    tokenizer_revision: str
+    prompt_hash: str
+    input_tokens: int
+    temperature: float
+    truncated: bool
+    mode: str
+
+AnswerOut = Annotated[ChoiceAnswerOut | ScoreAnswerOut | NoulAnswerOut, Field(discriminator="type")]
+
+class UsageOut(BaseModel):
+    input_tokens: int
+    output_tokens: int
+
+class SystemOneResponse(BaseModel):
+    model: str
+    model_revision: str
+    answers: dict[str, AnswerOut]
+    usage: UsageOut

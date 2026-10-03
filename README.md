@@ -43,6 +43,34 @@ curl -s localhost:8000/v1/systemone -H 'content-type: application/json' -d '{
 
 Use `"mode":"shared"` with at least two questions over the same state to prefill an exact token prefix once and branch independent KV caches. It is supported for SemIf only. The implementation checks that full token sequences actually share the state prefix. The default is direct mode. Prompts exceeding `max_context` fail clearly; no truncation occurs.
 
+## HTTP client
+
+`openjev-semif serve` hosts the API. The separate Python and CLI clients call that service **without loading a model in the client process**. `openjev-semif score` remains the local, in-process scorer.
+
+```bash
+openjev-semif client health --url http://127.0.0.1:8000
+openjev-semif client score --url http://127.0.0.1:8000 \
+  --state 'The build failed' --question 'What next?' \
+  --option 'Inspect logs' --option 'Ignore it'
+openjev-semif client systemone --url http://127.0.0.1:8000 \
+  --input examples/systemone.json
+```
+
+```python
+from openjev_semif import OpenJEVClient
+
+with OpenJEVClient("http://127.0.0.1:8000") as client:
+    print(client.health().status)
+    result = client.score({
+        "state": "The build failed",
+        "question": "What next?",
+        "options": ["Inspect logs", "Ignore it"],
+    })
+    print(result.best, result.options[0].probability)
+```
+
+For a protected `/v1/systemone`, pass `api_key=...` to `OpenJEVClient` or set `OPENJEV_API_KEY` for the CLI. The CLI also accepts `OPENJEV_URL` and `--timeout`. HTTP errors raise `OpenJEVHTTPError` with `status_code` and `detail`; connection and timeout errors come from `httpx`.
+
 ## CLI
 
 ```bash
@@ -60,6 +88,7 @@ See [architecture](docs/architecture.md) and [roadmap](docs/roadmap.md). Future 
 
 
 - `api/`: HTTP lifecycle and typed question contracts.
+- `client.py`: typed HTTP client for a running service.
 - `prompting/`: stable prompts, hashes, exact answer-token and boundary checks.
 - `scoring/`: separate likelihood and final-position SemIf scorers, temperature scaling.
 - `backends/`: model-independent scoring contract and resident Torch/Hugging Face backend.

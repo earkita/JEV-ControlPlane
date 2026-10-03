@@ -3,7 +3,8 @@ from __future__ import annotations
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Header
-from .schemas import ScoreRequest, SystemOneRequest, HealthResponse, OptionIn
+from .schemas import (ScoreRequest, ScoreResponse, SystemOneRequest, SystemOneResponse,
+                      HealthResponse, OptionIn)
 from .systemone import decision_for, answer_for
 from ..backends.registry import create_backend
 from ..config import Settings
@@ -42,7 +43,7 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
             scorer=settings.scorer, status="ready" if model else "loading",
             model_revision=model.model_revision if model else None)
 
-    @app.post("/score")
+    @app.post("/score", response_model=ScoreResponse)
     def score(req: ScoreRequest):
         model = get_backend()
         options = [Option(x.id, x.description) if isinstance(x, OptionIn)
@@ -54,7 +55,7 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
             return result.as_dict()
         except ValueError as exc: raise HTTPException(400, str(exc)) from exc
 
-    @app.post("/v1/systemone")
+    @app.post("/v1/systemone", response_model=SystemOneResponse)
     def systemone(req: SystemOneRequest, authorization: str | None = Header(default=None)):
         api_key = os.environ.get("OPENJEV_API_KEY")
         if api_key and authorization != f"Bearer {api_key}": raise HTTPException(401, "invalid API key")
