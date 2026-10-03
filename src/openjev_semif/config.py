@@ -13,6 +13,7 @@ class Settings:
     scorer: str = "semif"
     max_context: int = 4096
     temperature: float = 1.0
+    calibration_profile: str | None = None
     host: str = "127.0.0.1"
     port: int = 8000
 

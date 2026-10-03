@@ -28,13 +28,13 @@ def score_shared(backend, decisions, temperature=1.0):
     cache = backend.prefill(sequences[0][:prefix_length])
     shared_prefill = time.perf_counter()-mark
     results = []
-    for decision, (encoded, tokenization) in zip(decisions, prepared):
+    for index, (decision, (encoded, tokenization)) in enumerate(zip(decisions, prepared)):
         suffix = encoded[1][prefix_length:]
         mark = time.perf_counter()
         logits = backend.get_last_logits(cache, suffix)
         branch = time.perf_counter()-mark
         results.append(scorer.finish(decision, encoded, logits, temperature,
-            {"tokenization_s": tokenization, "prefill_s": 0.0, "shared_prefill_s": shared_prefill,
-             "branch_s": branch, "scoring_s": branch,
+            {"tokenization_s": tokenization, "prefill_s": 0.0, "shared_prefill_s": shared_prefill, "shared_prefix_tokens": prefix_length,
+             "branch_s": branch, "shared_question_index": index, "scoring_s": branch,
              "total_s": time.perf_counter()-started}, mode="shared"))
     return results

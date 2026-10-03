@@ -39,3 +39,39 @@ class CalibrationProfile:
     def save(self, path: str | Path) -> None:
         probabilities([0.0, 1.0], self.temperature)
         Path(path).write_text(json.dumps(self.__dict__, indent=2) + "\n")
+
+
+def effective_temperature(settings, backend) -> float:
+    """Use a profile only for the exact model revision and configured scorer."""
+    if not settings.calibration_profile:
+        return settings.temperature
+    profile = CalibrationProfile.load(settings.calibration_profile)
+    if (profile.model, profile.revision, profile.scorer) != (
+        backend.model_name, backend.model_revision, settings.scorer
+    ):
+        raise ValueError("calibration profile does not match model revision and scorer")
+    return profile.temperature
+
+
+def fit_temperature(rows: list[tuple[list[float], int]]) -> float:
+    """Fit a positive temperature by minimizing labelled negative log likelihood."""
+    if not rows:
+        raise ValueError("at least one labelled row is required")
+    for logits, label in rows:
+        if label < 0 or label >= len(logits):
+            raise ValueError("label index is out of range")
+        probabilities(logits)
+    def loss(log_t: float) -> float:
+        temp = math.exp(log_t)
+        total = 0.0
+        for logits, label in rows:
+            scaled = [x / temp for x in logits]
+            peak = max(scaled)
+            total += peak + math.log(sum(math.exp(x-peak) for x in scaled)) - scaled[label]
+        return total / len(rows)
+    lo, hi = math.log(0.05), math.log(20.0)
+    for _ in range(80):
+        left, right = lo + (hi-lo)/3, hi - (hi-lo)/3
+        if loss(left) <= loss(right): hi = right
+        else: lo = left
+    return math.exp((lo+hi)/2)

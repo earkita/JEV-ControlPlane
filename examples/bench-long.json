@@ -1,0 +1,30 @@
+{
+  "state": "A Linux CI build fails immediately after enabling a new MXFP4 CUDA kernel. The previous build passed. The error points to the kernel launch.",
+  "questions": [
+    {
+      "question": "What should be inspected first?",
+      "options": [
+        "The kernel error and logs",
+        "The README formatting",
+        "The release notes"
+      ]
+    },
+    {
+      "question": "Which action reduces production risk?",
+      "options": [
+        "Temporarily disable the new kernel",
+        "Ignore the failed build",
+        "Delete the tests"
+      ]
+    },
+    {
+      "question": "What confirms the fix?",
+      "options": [
+        "Run the failing tests again",
+        "Change the issue title",
+        "Restart the browser"
+      ]
+    }
+  ],
+  "state_repeat": 120
+}

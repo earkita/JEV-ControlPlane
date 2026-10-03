@@ -23,6 +23,7 @@ def parser():
             x.add_argument("--option", action="append", required=True)
         if name in ("bench", "eval"):
             x.add_argument("--input", type=Path, required=True)
+            if name == "bench": x.add_argument("--repeats", type=int, default=3)
             x.add_argument("--output", type=Path, required=True)
     return p
 
@@ -40,16 +41,18 @@ def main(argv=None):
         return
     from .backends.registry import create_backend
     model = create_backend(settings)
+    from .scoring.calibration import effective_temperature
+    temperature = effective_temperature(settings, model)
     if args.command == "score":
         from .scoring.base import Decision, Option
         from .scoring.semif import SemIfScorer
         from .scoring.likelihood import LikelihoodScorer
         decision = Decision(args.state, args.question, [Option(x, x) for x in args.option])
         scorer = SemIfScorer(model) if settings.scorer == "semif" else LikelihoodScorer(model)
-        print(json.dumps(scorer.score(decision, settings.temperature).as_dict(), indent=2))
+        print(json.dumps(scorer.score(decision, temperature).as_dict(), indent=2))
         return
     from .benchmark import bench, evaluate
-    output = bench(model, args.input, settings.temperature) if args.command == "bench" else evaluate(model, args.input, settings.scorer, settings.temperature)
+    output = bench(model, args.input, temperature, args.repeats) if args.command == "bench" else evaluate(model, args.input, settings.scorer, temperature)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(output, indent=2) + "\n")
     print(json.dumps(output, indent=2))

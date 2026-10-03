@@ -38,6 +38,10 @@ class TorchHFBackend:
         ).to(self.device).eval()
         model_context = getattr(config, "max_position_embeddings", None)
         self.max_context = min(settings.max_context, model_context) if model_context else settings.max_context
+        import transformers
+        self.metadata = {"torch": torch.__version__, "transformers": transformers.__version__,
+                         "device": self.device, "dtype": self.dtype,
+                         "gpu": torch.cuda.get_device_name(self.device) if str(self.device).startswith("cuda") else None}
         self._selective_logits = "logits_to_keep" in inspect.signature(self.model.forward).parameters
 
     def synchronize(self):

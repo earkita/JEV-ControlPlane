@@ -10,16 +10,18 @@ from ..config import Settings
 from ..scoring.base import Decision, Option
 from ..scoring.likelihood import LikelihoodScorer
 from ..scoring.semif import SemIfScorer
+from ..scoring.calibration import effective_temperature
 from ..runtime.shared_state import score_shared
 
 
 def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
     settings = settings or Settings.from_env()
-    state = {"backend": backend}
+    state = {"backend": backend, "default_temperature": settings.temperature}
 
     @asynccontextmanager
     async def lifespan(app):
         if state["backend"] is None: state["backend"] = create_backend(settings)
+        state["default_temperature"] = effective_temperature(settings, state["backend"])
         yield
         state["backend"] = None
 
@@ -48,7 +50,7 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
         if len({x.id for x in options}) != len(options): raise HTTPException(400, "option ids must be unique")
         try:
             result = scorer_for(req.scorer or settings.scorer, model).score(
-                Decision(req.state, req.question, options), req.temperature or settings.temperature)
+                Decision(req.state, req.question, options), req.temperature or state["default_temperature"])
             return result.as_dict()
         except ValueError as exc: raise HTTPException(400, str(exc)) from exc
 
@@ -63,7 +65,7 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
         questions = list(req.questions.items())
         decisions = [decision_for(req.state, q) for _, q in questions]
         try:
-            temperature = req.temperature or settings.temperature
+            temperature = req.temperature or state["default_temperature"]
             if req.mode == "shared": results = score_shared(model, decisions, temperature)
             else: results = [scorer_for(scorer, model).score(d, temperature) for d in decisions]
         except ValueError as exc: raise HTTPException(400, str(exc)) from exc

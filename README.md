@@ -21,7 +21,7 @@ CUDA_VISIBLE_DEVICES=0 .venv/bin/openjev-semif serve \
   --device cuda --dtype bfloat16 --port 8000
 ```
 
-The Hugging Face model revision is resolved to a commit before loading and is returned in responses. Set `--revision` to pin one explicitly. `MODEL`, `REVISION`, `BACKEND`, `DEVICE`, `DTYPE`, `SCORER`, `MAX_CONTEXT`, `TEMPERATURE`, `HOST`, and `PORT` are supported environment settings. `--config settings.json` may supply the same fields; CLI flags override config and environment values.
+The Hugging Face model revision is resolved to a commit before loading and is returned in responses. Set `--revision` to pin one explicitly. `MODEL`, `REVISION`, `BACKEND`, `DEVICE`, `DTYPE`, `SCORER`, `MAX_CONTEXT`, `TEMPERATURE`, `CALIBRATION_PROFILE`, `HOST`, and `PORT` are supported environment settings. `--config settings.json` may supply the same fields; CLI flags override config and environment values.
 
 ```bash
 curl -s localhost:8000/v1/systemone -H 'content-type: application/json' -d '{
@@ -63,7 +63,7 @@ The benchmark reports requests/s, decisions/s, p50/p95 latency, prefill time, an
 - `runtime/`: shared token-prefix/KV branching.
 - `benchmarks/`: local comparison tooling.
 
-The backend protocol has `forward`, `prefill`, `get_last_logits`, and `sequence_logprob`; this leaves room for remote or quantized backends without changing the HTTP contract. Calibration profiles can be stored per model revision and workload using `CalibrationProfile`.
+The backend protocol has `forward`, `prefill`, `get_last_logits`, and `sequence_logprob`; this leaves room for remote or quantized backends without changing the HTTP contract. Calibration profiles can be stored per model revision and workload using `CalibrationProfile`; set `CALIBRATION_PROFILE` to apply one. The service rejects profiles for another model revision or scorer. `fit_temperature` fits a labelled validation set, which should be disjoint from evaluation data.
 
 ## Acknowledgements and licenses
 
