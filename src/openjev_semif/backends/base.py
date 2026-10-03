@@ -1,0 +1,17 @@
+"""Model backend protocol. A remote backend can implement this contract."""
+from __future__ import annotations
+from typing import Protocol, Any
+
+class ModelBackend(Protocol):
+    model_name: str
+    model_revision: str
+    tokenizer_revision: str
+    device: str
+    dtype: str
+    tokenizer: Any
+    max_context: int
+    def forward(self, ids: list[int]) -> list[float]: ...
+    def prefill(self, ids: list[int]) -> Any: ...
+    def get_last_logits(self, cache: Any, suffix: list[int]) -> list[float]: ...
+    def sequence_logprob(self, prefix: list[int], continuation: list[int]) -> float: ...
+    def synchronize(self) -> None: ...

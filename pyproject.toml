@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "openjev-semif"
+version = "0.1.0"
+description = "Typed local decisions with likelihood and SemIf option-logit scoring"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE", "LICENSE-SemIf"]
+dependencies = ["fastapi>=0.115", "pydantic>=2.10", "uvicorn>=0.30"]
+
+[project.optional-dependencies]
+torch = ["torch>=2.6", "transformers>=5.0", "accelerate>=1.0", "safetensors>=0.5", "sentencepiece>=0.2", "protobuf>=5"]
+test = ["pytest>=8", "httpx>=0.27"]
+
+[project.scripts]
+openjev-semif = "openjev_semif.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/openjev_semif"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
