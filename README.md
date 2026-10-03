@@ -56,6 +56,9 @@ The benchmark reports requests/s, decisions/s, p50/p95 latency, prefill time, an
 
 ## Architecture
 
+See [architecture](docs/architecture.md) and [roadmap](docs/roadmap.md). Future AI contributors should follow [AGENTS.md](AGENTS.md).
+
+
 - `api/`: HTTP lifecycle and typed question contracts.
 - `prompting/`: stable prompts, hashes, exact answer-token and boundary checks.
 - `scoring/`: separate likelihood and final-position SemIf scorers, temperature scaling.

@@ -7,3 +7,4 @@ benchmark-results/
 *.safetensors
 .env
 .venv-test/
+dist/
