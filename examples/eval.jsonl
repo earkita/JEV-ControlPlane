@@ -1,0 +1,2 @@
+{"state":"A new kernel causes a CI failure.","question":"What should be inspected?","options":["Kernel logs","README spelling"],"label":"Kernel logs"}
+{"state":"A release test is red.","question":"What should happen before deployment?","options":["Investigate the failing test","Ignore the test"],"label":"Investigate the failing test"}
