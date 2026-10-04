@@ -346,12 +346,21 @@
     return typeof value === "string" ? value : JSON.stringify(value);
   }
 
+  function renderState(parent, state) {
+    const box = element("section", "state-preview");
+    const content = typeof state === "string" ? state : JSON.stringify(state, null, 2);
+    box.append(element("span", "overline", "SYTUACJA WEJŚCIOWA"),
+      element("pre", "", content));
+    parent.append(box);
+  }
+
   function renderSingle(data, payload) {
     const root = ui.result;
     const kicker = element("div", "result-kicker");
     kicker.append(element("span", "", "TOP CHOICE"), element("span", "", data.scorer.toUpperCase()));
     root.append(kicker, element("h3", "winner", displayQuestion(payload.question, "Decyzja")),
       element("p", "result-subtitle", `Wybór: ${data.best}`));
+    renderState(root, payload.state);
     renderProbabilities(root, data.options.map((option) => ({
       id: option.option, description: option.description, probability: option.probability,
       rawScore: option.raw_score,
@@ -383,6 +392,7 @@
     addMetric(summary, "Pytania", count);
     addMetric(summary, "Tokeny łącznie", data.usage.input_tokens);
     root.append(summary);
+    renderState(root, payload.state);
     for (const [id, answer] of Object.entries(data.answers)) {
       const question = payload.questions[id];
       const descriptions = batchDescriptions(question);
@@ -438,12 +448,7 @@
       const source = payload.cases.find((item) => item.id === caseResult.id);
       const section = element("section", "case-result");
       section.append(element("h3", "case-heading", caseResult.id));
-      if (source) {
-        const state = element("details", "case-state");
-        state.append(element("summary", "", "Pokaż stan"),
-          element("pre", "", typeof source.state === "string" ? source.state : JSON.stringify(source.state, null, 2)));
-        section.append(state);
-      }
+      if (source) renderState(section, source.state);
       for (const item of caseResult.questions) {
         const question = source?.questions.find((entry) => entry.id === item.id);
         const descriptions = Object.fromEntries((question?.options || []).map((option) => [option.id, option.description]));
