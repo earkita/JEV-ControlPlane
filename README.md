@@ -1,6 +1,6 @@
 # OpenJEV-SemIf
 
-A single-model decision service with two explicit scoring methods. **SemIf** selects final-position letter logits for listed options; **likelihood** computes the conditional log probability of each option's text. Neither method generates an answer. The service loads one Hugging Face model at startup.
+A single-model decision service with two explicit scoring methods. **SemIf** selects final-position letter logits for listed options; **likelihood** computes the conditional log probability of each option's text. Neither method generates an answer. The Torch profile loads one Hugging Face model at startup; the OpenJev 27B GGUF profile uses one resident llama.cpp process behind the same API.
 
 ## Install
 
@@ -60,6 +60,38 @@ CUDA_VISIBLE_DEVICES=0 .venv/bin/openjev-semif serve \
 
 The `--revision` value records the upstream snapshot in responses when `--model` is a local path. The model directory is outside Git; `--model Qwen/Qwen3.5-4B` remains available and uses the normal Hugging Face cache.
 
+### OpenJev 27B on RTX 3090
+
+The [OpenJev 27B S1MB submission](https://huggingface.co/datasets/hotchpotch/s1mb-result/discussions/2) evaluated the 16-bit model. Its weights need about 54 GB; the local 24 GB profile uses the **text-only Q4_K_M GGUF** (16.5 GB). The [GGUF model card](https://huggingface.co/openjev/openjev-GGUF) reports 82.84% on its 1,789-row validation set versus 83.17% for the 16-bit reference. This is a different precision and evaluation set from the leaderboard entry, so local results should not be called a reproduction of its score.
+
+Install the Python package as above, then download the pinned GGUF, tokenizer, and a CUDA `llama-server` outside Git:
+
+```bash
+mkdir -p "$HOME/ai/models/openjev/OpenJev-27B-Q4_K_M/tokenizer" "$HOME/ai/llama.cpp-prebuilt/llama-b11393"
+hf download openjev/openjev-GGUF OpenJev-Q4_K_M.gguf SHA256SUMS LICENSE NOTICE MANIFEST.json \
+  --revision 7c0a4c624342dd283f8d1bd215fbbe72cb0059f7 \
+  --local-dir "$HOME/ai/models/openjev/OpenJev-27B-Q4_K_M"
+hf download openjev/openjev tokenizer.json tokenizer_config.json chat_template.jinja \
+  --revision 5ec9e5fd2f80a6fff386779b1e5ac7e389971889 \
+  --local-dir "$HOME/ai/models/openjev/OpenJev-27B-Q4_K_M/tokenizer"
+cd "$HOME/ai/llama.cpp-prebuilt/llama-b11393"
+curl -fL -o llama-cuda.tar.gz \
+  https://github.com/ggml-org/llama.cpp/releases/download/b11393/llama-b11393-bin-ubuntu-cuda-12.8-x64.tar.gz
+tar -xzf llama-cuda.tar.gz
+cd -
+```
+
+Verify the GGUF hash against the downloaded `SHA256SUMS` before serving it. Use a compatible NVIDIA driver for the CUDA 12.8 binary; alternatively build `llama-server` from [llama.cpp](https://github.com/ggml-org/llama.cpp) and set `LLAMA_SERVER_BIN` to that binary. With the 4B server stopped to free GPU memory:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 ./launch-openjev27b.sh
+curl -s http://127.0.0.1:8002/health
+```
+
+The 27B API and workbench are at `http://127.0.0.1:8002` and `/ui`. The launcher starts and stops `llama-server` with the API process. It reads [config/serve-openjev27b.json](config/serve-openjev27b.json); `PORT=8003 ./launch-openjev27b.sh` overrides the API port, `LLAMA_SERVER_BIN`, `OPENJEV27B_MODEL`, `LLAMA_SERVER_PORT`, `LLAMA_CONTEXT`, and `LLAMA_N_GPU_LAYERS` control the inference process. The default context is 8192 tokens and the default choice temperature is 0.85. The model is loaded once, and requests with excess input fail without truncation.
+
+This profile supports `/score`, typed `choice`, `score`, and `noul` under `/v1/systemone`, and the existing HTTP client and UI. It supports **SemIf direct only**; likelihood and shared KV mode require separate correctness work for this GGUF runtime. Its `bench` and `eval` CLI commands remain Torch-only. The GGUF is text-only. Its weights are licensed **CC BY-NC 4.0** (attribution and noncommercial use); see [NOTICE](NOTICE.md) and the upstream [model card](https://huggingface.co/openjev/openjev-GGUF).
+
 ## API example
 
 ```bash
@@ -80,11 +112,11 @@ curl -s localhost:8000/v1/systemone -H 'content-type: application/json' -d '{
 
 `GET /health` reports load status, model, backend, device, dtype, scorer and revision. `POST /score` accepts `state`, `question`, `options`, optional `scorer` and `temperature`. Options may be strings or `{id, description}` objects. `/v1/systemone` accepts typed `choice`, `score`, and `noul` questions. Responses include option probabilities, raw scores (on `/score`), entropy concentration, timing, input token count, prompt hash, scorer and model/tokenizer revision. Probabilities are conditional over listed options; confidence is normalized entropy concentration, **not** a calibrated accuracy estimate.
 
-Use `"mode":"shared"` with at least two questions over the same state to prefill an exact token prefix once and branch independent KV caches. It is supported for SemIf only. The implementation checks that full token sequences actually share the state prefix. The default is direct mode. Prompts exceeding `max_context` fail clearly; no truncation occurs.
+Use `"mode":"shared"` with at least two questions over the same state to prefill an exact token prefix once and branch independent KV caches. It is supported for SemIf on the Torch backend only. The implementation checks that full token sequences actually share the state prefix. The default is direct mode. Prompts exceeding `max_context` fail clearly; no truncation occurs.
 
 ## Web UI
 
-The server also serves a built-in decision workbench at **`http://127.0.0.1:8000/ui`** (or `/`). It has a single-decision form for `/score` and a multi-question form for `/v1/systemone`, including `choice`, `score`, and `noul` questions. Choose SemIf or likelihood, set temperature, and use direct or shared mode for multiple SemIf questions. Results show option distributions, confidence, timings, token counts, prompt hashes, and model revision; JSON can be copied or downloaded.
+The server also serves a built-in decision workbench at **`http://127.0.0.1:8000/ui`** (or `/`; the 27B profile uses port 8002). It has a single-decision form for `/score` and a multi-question form for `/v1/systemone`, including `choice`, `score`, and `noul` questions. On Torch, choose SemIf or likelihood and direct or shared mode. On GGUF, the UI selects SemIf direct and reads the default temperature from `/health`. Results show option distributions, confidence, timings, token counts, prompt hashes, and model revision; JSON can be copied or downloaded.
 
 The UI uses local HTML/CSS/JavaScript assets in `src/openjev_semif/web/`. It is served by the same FastAPI process and does not load a second model, need Gradio, or require a frontend build. The API documentation remains available at `/docs`. If `OPENJEV_API_KEY` protects `/v1/systemone`, enter the key in the UI's authorization field for that browser tab; it is not saved by the page.
 
@@ -140,7 +172,7 @@ See [architecture](docs/architecture.md) and [roadmap](docs/roadmap.md). Future 
 - `runtime/`: shared token-prefix/KV branching.
 - `benchmarks/`: local comparison tooling.
 
-The backend protocol has `forward`, `prefill`, `get_last_logits`, and `sequence_logprob`; this leaves room for remote or quantized backends without changing the HTTP contract. Calibration profiles can be stored per model revision and workload using `CalibrationProfile`; set `CALIBRATION_PROFILE` to apply one. The service rejects profiles for another model revision or scorer. `fit_temperature` fits a labelled validation set, which should be disjoint from evaluation data.
+The Torch backend protocol has `forward`, `prefill`, `get_last_logits`, and `sequence_logprob`. The GGUF adapter asks a resident llama.cpp server for one-token log probabilities and maps them to the same typed response; it does not claim Torch KV reuse or likelihood support. Calibration profiles can be stored per model revision and workload using `CalibrationProfile`; set `CALIBRATION_PROFILE` to apply one. The service rejects profiles for another model revision or scorer. `fit_temperature` fits a labelled validation set, which should be disjoint from evaluation data.
 
 ## Acknowledgements and licenses
 

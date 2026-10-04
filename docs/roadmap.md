@@ -1,6 +1,6 @@
 # Next steps
 
-1. **Qwen 27B:** Keep the same scoring and API contracts. Add a quantized or multi-GPU Torch backend and explicit memory tests; a 27B BF16 checkpoint alone exceeds 24 GB. Recheck A–P token boundaries and direct/shared equivalence for the exact tokenizer and runtime.
+1. **OpenJev 27B:** The text-only Q4_K_M GGUF direct SemIf profile now runs on RTX 3090 through llama.cpp. Add verified direct/shared equivalence with native llama.cpp KV branching before exposing shared mode; benchmark accuracy and latency against the 4B Torch profile on a common held-out workload. Full BF16 weights still exceed 24 GB.
 2. **GLM and other causal LMs:** Implement the backend protocol, then run the answer-token and cache correctness tests on each tokenizer/model pair. If a letter is not one stable token, offer an explicitly named multi-token scorer instead of silently changing SemIf semantics.
 3. **Remote inference:** Add a backend that can return full final-position vocabulary logits and identify model/tokenizer revisions. If an endpoint cannot expose exact logits or KV branches, disable those modes clearly.
 4. **Hermes or Claude Code harness:** Wrap `/v1/systemone` as a decision tool, pass structured state and criteria, record the returned prompt hash and revision in agent traces, and test timeout/retry behavior with a local server.
