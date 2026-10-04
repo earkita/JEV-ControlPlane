@@ -114,6 +114,10 @@ curl -s localhost:8000/v1/systemone -H 'content-type: application/json' -d '{
 
 Use `"mode":"shared"` with at least two questions over the same state to prefill an exact token prefix once and branch independent KV caches. It is supported for SemIf on the Torch backend only. The implementation checks that full token sequences actually share the state prefix. The default is direct mode. Prompts exceeding `max_context` fail clearly; no truncation occurs.
 
+## Generated decision cases
+
+For AI-generated test inputs, send arrays of cases with a `state`, named questions, candidate `{id, description}` options and an optional `expected_option`. `POST /v1/cases/validate` checks the JSON without inference; `POST /v1/cases/evaluate` scores it and compares labelled answers. See the [case API guide](docs/decision-cases.md) and [example batch](examples/decision-cases.json). Generated labels should be reviewed before using aggregate matches as an accuracy measurement.
+
 ## Web UI
 
 The server also serves a built-in decision workbench at **`http://127.0.0.1:8000/ui`** (or `/`; the 27B profile uses port 8002). It has a single-decision form for `/score` and a multi-question form for `/v1/systemone`, including `choice`, `score`, and `noul` questions. On Torch, choose SemIf or likelihood and direct or shared mode. On GGUF, the UI selects SemIf direct and reads the default temperature from `/health`. Results show option distributions, confidence, timings, token counts, prompt hashes, and model revision; JSON can be copied or downloaded.

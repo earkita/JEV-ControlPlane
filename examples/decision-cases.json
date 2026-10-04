@@ -1,0 +1,36 @@
+{
+  "cases": [
+    {
+      "id": "ci-kernel-001",
+      "state": {
+        "event": "Build failed after enabling a new MXFP4 kernel",
+        "evidence": ["The previous build passed", "The error points to the kernel launch"]
+      },
+      "provenance": {
+        "generator_model": "example-generator",
+        "dataset": "synthetic-ci-v1"
+      },
+      "questions": [
+        {
+          "id": "next_action",
+          "question": "What should the agent do next?",
+          "options": [
+            {"id": "debug", "description": "Inspect the failing kernel and logs"},
+            {"id": "rollback", "description": "Disable the optimization"},
+            {"id": "retest", "description": "Run the same tests without examining the failure"}
+          ],
+          "expected_option": "debug"
+        },
+        {
+          "id": "verification",
+          "question": "After a fix, what verifies it?",
+          "options": [
+            {"id": "rerun", "description": "Run the failing tests again"},
+            {"id": "skip", "description": "Skip the tests"}
+          ],
+          "expected_option": "rerun"
+        }
+      ]
+    }
+  ]
+}
