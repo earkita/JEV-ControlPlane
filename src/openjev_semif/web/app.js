@@ -341,13 +341,17 @@
     parent.append(list);
   }
 
-  function renderSingle(data) {
+  function displayQuestion(value, fallback) {
+    if (value == null || value === "") return fallback;
+    return typeof value === "string" ? value : JSON.stringify(value);
+  }
+
+  function renderSingle(data, payload) {
     const root = ui.result;
-    const selected = data.options.find((option) => option.option === data.best) || data.options[data.best_index];
     const kicker = element("div", "result-kicker");
     kicker.append(element("span", "", "TOP CHOICE"), element("span", "", data.scorer.toUpperCase()));
-    root.append(kicker, element("h3", "winner", selected?.description || data.best),
-      element("p", "result-subtitle", `ID: ${data.best} · Pewność (koncentracja rozkładu): ${formatPercent(data.confidence)}`));
+    root.append(kicker, element("h3", "winner", displayQuestion(payload.question, "Decyzja")),
+      element("p", "result-subtitle", `Wybór: ${data.best}`));
     renderProbabilities(root, data.options.map((option) => ({
       id: option.option, description: option.description, probability: option.probability,
       rawScore: option.raw_score,
@@ -386,19 +390,19 @@
       const cardTop = element("div", "result-kicker");
       cardTop.append(element("span", "", id), element("span", "", `${answer.type.toUpperCase()} · ${answer.scorer.toUpperCase()}`));
       let best;
-      let title;
+      let answerSummary;
       if (answer.type === "choice") {
         best = answer.choice;
-        title = descriptions[best] || best;
+        answerSummary = `Wybór: ${best}`;
       } else if (answer.type === "score") {
         best = Object.entries(answer.probabilities).sort((a, b) => b[1] - a[1])[0]?.[0];
-        title = `Ocena ${Number(answer.score).toFixed(2)}`;
+        answerSummary = `Ocena: ${Number(answer.score).toFixed(2)}`;
       } else {
         best = answer.noul >= 0.5 ? "true" : "false";
-        title = best === "true" ? "Tak" : "Nie";
+        answerSummary = `Odpowiedź: ${best === "true" ? "Tak" : "Nie"}`;
       }
-      card.append(cardTop, element("h4", "winner", title),
-        element("p", "result-subtitle", question.instructions));
+      card.append(cardTop, element("h4", "winner", displayQuestion(question.instructions, id)),
+        element("p", "result-subtitle", answerSummary));
       renderProbabilities(card, Object.entries(answer.probabilities).map(([key, probability]) => ({
         id: key, description: String(descriptions[key] || key), probability,
       })), best);
@@ -449,11 +453,11 @@
         cardTop.append(element("span", "", item.id), element("span", "", answer.scorer.toUpperCase()));
         const match = item.matched === null ? "Bez etykiety" : item.matched ? "Zgodne z etykietą" : "Różni się od etykiety";
         const matchKind = item.matched === null ? "unlabelled" : item.matched ? "matched" : "mismatched";
-        card.append(cardTop, element("h4", "winner", descriptions[answer.choice] || answer.choice),
-          element("p", "result-subtitle", question?.question || item.id),
+        card.append(cardTop, element("h4", "winner", displayQuestion(question?.question, item.id)),
+          element("p", "result-subtitle", `Wybór: ${answer.choice}`),
           element("span", `match-badge ${matchKind}`, match));
         if (item.expected_option !== null)
-          card.append(element("p", "expected-note", `Oczekiwano: ${descriptions[item.expected_option] || item.expected_option}`));
+          card.append(element("p", "expected-note", `Oczekiwano (ID): ${item.expected_option}`));
         renderProbabilities(card, Object.entries(answer.probabilities).map(([id, probability]) => ({
           id, description: descriptions[id] || id, probability,
         })), answer.choice);
@@ -516,7 +520,7 @@
       if (!response.ok) throw new Error(detailMessage(body, response.status));
       lastResult = body;
       ui.result.replaceChildren();
-      if (request.path === "/score") renderSingle(body);
+      if (request.path === "/score") renderSingle(body, request.body);
       else if (request.path === "/v1/cases/evaluate") renderCases(body, request.body);
       else renderBatch(body, request.body);
       ui.empty.hidden = true;
