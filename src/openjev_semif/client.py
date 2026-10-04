@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 from .api.schemas import (
     HealthResponse, ScoreRequest, ScoreResponse, SystemOneRequest, SystemOneResponse,
+    CaseBatchRequest, CaseBatchResponse, CaseValidationResponse,
 )
 
 class OpenJEVHTTPError(RuntimeError):
@@ -59,3 +60,13 @@ class OpenJEVClient:
         request = SystemOneRequest.model_validate(request)
         data = self._request("POST", "/v1/systemone", request.model_dump(exclude_none=True))
         return SystemOneResponse.model_validate(data)
+
+    def validate_cases(self, request: CaseBatchRequest | dict[str, Any]) -> CaseValidationResponse:
+        request = CaseBatchRequest.model_validate(request)
+        data = self._request("POST", "/v1/cases/validate", request.model_dump(exclude_none=True))
+        return CaseValidationResponse.model_validate(data)
+
+    def evaluate_cases(self, request: CaseBatchRequest | dict[str, Any]) -> CaseBatchResponse:
+        request = CaseBatchRequest.model_validate(request)
+        data = self._request("POST", "/v1/cases/evaluate", request.model_dump(exclude_none=True))
+        return CaseBatchResponse.model_validate(data)

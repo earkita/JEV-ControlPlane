@@ -7,7 +7,8 @@ from fastapi import FastAPI, HTTPException, Header
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from .schemas import (ScoreRequest, ScoreResponse, SystemOneRequest, SystemOneResponse,
-                      HealthResponse, OptionIn)
+                      HealthResponse, OptionIn, CaseBatchRequest, CaseBatchResponse,
+                      CaseValidationResponse, ChoiceQuestion)
 from .systemone import decision_for, answer_for
 from ..backends.registry import create_backend
 from ..backends.llama_cpp import BackendUnavailable
@@ -50,6 +51,11 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
     def scorer_for(name, model):
         return SemIfScorer(model) if name == "semif" else LikelihoodScorer(model)
 
+    def require_api_key(authorization):
+        api_key = os.environ.get("OPENJEV_API_KEY")
+        if api_key and authorization != f"Bearer {api_key}":
+            raise HTTPException(401, "invalid API key")
+
     @app.get("/health", response_model=HealthResponse)
     def health():
         model = state["backend"]
@@ -78,10 +84,7 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
         except ValueError as exc: raise HTTPException(400, str(exc)) from exc
         except BackendUnavailable as exc: raise HTTPException(502, str(exc)) from exc
 
-    @app.post("/v1/systemone", response_model=SystemOneResponse)
-    def systemone(req: SystemOneRequest, authorization: str | None = Header(default=None)):
-        api_key = os.environ.get("OPENJEV_API_KEY")
-        if api_key and authorization != f"Bearer {api_key}": raise HTTPException(401, "invalid API key")
+    def run_systemone(req: SystemOneRequest):
         model = get_backend()
         scorer = req.scorer or settings.scorer
         if hasattr(model, "score_decision") and scorer != "semif":
@@ -105,4 +108,54 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
         return {"model": model.model_name, "model_revision": model.model_revision,
                 "answers": answers, "usage": {"input_tokens": sum(r.input_tokens for r in results),
                                               "output_tokens": 0}}
+
+    @app.post("/v1/systemone", response_model=SystemOneResponse)
+    def systemone(req: SystemOneRequest, authorization: str | None = Header(default=None)):
+        require_api_key(authorization)
+        return run_systemone(req)
+
+    @app.post("/v1/cases/validate", response_model=CaseValidationResponse)
+    def validate_cases(req: CaseBatchRequest, authorization: str | None = Header(default=None)):
+        require_api_key(authorization)
+        return {"valid": True, "case_count": len(req.cases),
+                "question_count": sum(len(case.questions) for case in req.cases),
+                "labelled_count": sum(q.expected_option is not None
+                                      for case in req.cases for q in case.questions)}
+
+    @app.post("/v1/cases/evaluate", response_model=CaseBatchResponse)
+    def evaluate_cases(req: CaseBatchRequest, authorization: str | None = Header(default=None)):
+        require_api_key(authorization)
+        get_backend()
+        cases = []
+        input_tokens = 0
+        model_name = None
+        model_revision = None
+        labelled_count = 0
+        matched_count = 0
+        for case in req.cases:
+            questions = {q.id: ChoiceQuestion(type="choice", instructions=q.question,
+                criteria={option.id: option.description for option in q.options})
+                for q in case.questions}
+            result = run_systemone(SystemOneRequest(state=case.state, questions=questions,
+                scorer=req.scorer, mode=req.mode, temperature=req.temperature))
+            model_name = result["model"]
+            model_revision = result["model_revision"]
+            input_tokens += result["usage"]["input_tokens"]
+            evaluations = []
+            for q in case.questions:
+                answer = result["answers"][q.id]
+                matched = None if q.expected_option is None else answer["choice"] == q.expected_option
+                if matched is not None:
+                    labelled_count += 1
+                    matched_count += int(matched)
+                evaluations.append({"id": q.id, "expected_option": q.expected_option,
+                                    "matched": matched, "answer": answer})
+            cases.append({"id": case.id, "provenance": case.provenance,
+                          "questions": evaluations})
+        question_count = sum(len(case.questions) for case in req.cases)
+        return {"model": model_name, "model_revision": model_revision, "cases": cases,
+                "summary": {"case_count": len(cases), "question_count": question_count,
+                            "labelled_count": labelled_count, "matched_count": matched_count,
+                            "accuracy": matched_count / labelled_count if labelled_count else None},
+                "usage": {"input_tokens": input_tokens, "output_tokens": 0}}
     return app

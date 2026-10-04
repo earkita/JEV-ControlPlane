@@ -29,7 +29,7 @@ def parser():
             x.add_argument("--output", type=Path, required=True)
     client = sub.add_parser("client", help="Call a running HTTP service without loading a model")
     client_sub = client.add_subparsers(dest="client_command", required=True)
-    for name in ("health", "score", "systemone"):
+    for name in ("health", "score", "systemone", "cases-validate", "cases-evaluate"):
         x = client_sub.add_parser(name)
         x.add_argument("--url", default=os.environ.get("OPENJEV_URL", "http://127.0.0.1:8000"))
         x.add_argument("--api-key", default=os.environ.get("OPENJEV_API_KEY"))
@@ -40,7 +40,7 @@ def parser():
             x.add_argument("--option", action="append", required=True)
             x.add_argument("--scorer", choices=("semif", "likelihood"))
             x.add_argument("--temperature", type=float)
-        elif name == "systemone":
+        elif name in ("systemone", "cases-validate", "cases-evaluate"):
             x.add_argument("--input", type=Path, required=True)
     return p
 
@@ -65,8 +65,12 @@ def main(argv=None):
                 if args.scorer: request["scorer"] = args.scorer
                 if args.temperature is not None: request["temperature"] = args.temperature
                 result = client.score(request)
-            else:
+            elif args.client_command == "systemone":
                 result = client.systemone(json.loads(args.input.read_text()))
+            elif args.client_command == "cases-validate":
+                result = client.validate_cases(json.loads(args.input.read_text()))
+            else:
+                result = client.evaluate_cases(json.loads(args.input.read_text()))
         print(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
         return
     settings = load_settings(args)
