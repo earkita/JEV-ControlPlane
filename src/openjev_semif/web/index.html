@@ -44,11 +44,11 @@
       <div class="workspace">
         <form id="decision-form" class="editor-panel" novalidate>
           <div class="panel-title-row">
-            <div><span class="overline">INPUT / 01</span><h2>Zbuduj decyzję</h2></div>
+            <div><span class="overline">INPUT / 01</span><h2>Podaj decyzję</h2></div>
             <button class="subtle-button" type="button" id="load-preset">↙ Wczytaj przykład</button>
           </div>
 
-          <section class="form-section" aria-labelledby="state-heading">
+          <section id="state-section" class="form-section" aria-labelledby="state-heading" hidden>
             <div class="section-heading"><span class="step">01</span><h3 id="state-heading">Stan</h3><span class="section-hint">Wspólna baza dla pytań</span></div>
             <label class="field-label" for="state-input">Kontekst lub obserwacje</label>
             <textarea id="state-input" class="textarea state-input" placeholder="Opisz sytuację, logi, historię lub stan agenta…" rows="6" required></textarea>
@@ -56,13 +56,35 @@
           </section>
 
           <section class="form-section" aria-labelledby="questions-heading">
-            <div class="section-heading"><span class="step">02</span><h3 id="questions-heading">Pytania i opcje</h3></div>
+            <div class="section-heading"><span class="step">02</span><h3 id="questions-heading">Dane wejściowe</h3></div>
             <div class="tabs" role="tablist" aria-label="Tryb formularza">
-              <button id="tab-single" class="tab active" type="button" role="tab" aria-selected="true" aria-controls="panel-single">Jedna decyzja</button>
+              <button id="tab-json" class="tab active" type="button" role="tab" aria-selected="true" aria-controls="panel-json">Wklej JSON</button>
+              <button id="tab-single" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-single">Jedna decyzja</button>
               <button id="tab-batch" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-batch">Wiele pytań <span class="tab-tag">SystemOne</span></button>
             </div>
 
-            <div id="panel-single" class="tab-panel" role="tabpanel" aria-labelledby="tab-single">
+            <div id="panel-json" class="tab-panel" role="tabpanel" aria-labelledby="tab-json">
+              <p class="panel-note">Wklej przypadki testowe (<code>cases</code>), pojedynczy przypadek, żądanie <code>/score</code> albo <code>/v1/systemone</code>. Wyniki pojawią się obok. <a href="/docs" target="_blank" rel="noopener">Schemat API ↗</a></p>
+              <label class="field-label" for="json-input">Stan, pytania i możliwe odpowiedzi jako JSON</label>
+              <textarea id="json-input" class="textarea json-input" rows="17" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder='{
+  "cases": [{
+    "id": "case-001",
+    "state": "Build failed",
+    "questions": [{
+      "id": "next_action",
+      "question": "What next?",
+      "options": [
+        {"id": "debug", "description": "Inspect logs"},
+        {"id": "ignore", "description": "Ignore failure"}
+      ],
+      "expected_option": "debug"
+    }]
+  }]
+}' aria-describedby="json-help"></textarea>
+              <p id="json-help" class="settings-note">Opcjonalne <code>expected_option</code> służy tylko do porównania wyniku i nie trafia do promptu modelu. Uruchom: Ctrl+Enter (Mac: ⌘+Enter).</p>
+            </div>
+
+            <div id="panel-single" class="tab-panel" role="tabpanel" aria-labelledby="tab-single" hidden>
               <label class="field-label" for="single-question">Pytanie</label>
               <textarea id="single-question" class="textarea short-textarea" rows="2" placeholder="Co powinien zrobić agent?" required></textarea>
               <div class="list-heading"><span class="field-label">Dostępne opcje</span><span class="mini-note">2–16 opcji</span></div>
@@ -78,27 +100,29 @@
           </section>
 
           <section class="form-section settings-section" aria-labelledby="settings-heading">
-            <div class="section-heading"><span class="step">03</span><h3 id="settings-heading">Ustawienia</h3></div>
-            <div class="settings-grid">
-              <label class="field"><span class="field-label">Scorer</span>
-                <select id="scorer-input"><option value="semif">SemIf · logity liter</option><option value="likelihood">Likelihood · tekst opcji</option></select>
-              </label>
-              <label class="field"><span class="field-label">Temperatura</span>
-                <input id="temperature-input" type="number" min="0.01" step="0.05" value="1.00" inputmode="decimal">
-              </label>
-              <label id="mode-field" class="field mode-field" hidden><span class="field-label">Tryb pytań</span>
-                <select id="mode-input"><option value="direct">Direct</option><option value="shared">Shared KV</option></select>
-              </label>
+            <div class="section-heading"><span class="step">03</span><h3 id="settings-heading">Autoryzacja</h3></div>
+            <div id="manual-settings" hidden>
+              <div class="settings-grid">
+                <label class="field"><span class="field-label">Scorer</span>
+                  <select id="scorer-input"><option value="semif">SemIf · logity liter</option><option value="likelihood">Likelihood · tekst opcji</option></select>
+                </label>
+                <label class="field"><span class="field-label">Temperatura</span>
+                  <input id="temperature-input" type="number" min="0.01" step="0.05" value="1.00" inputmode="decimal">
+                </label>
+                <label id="mode-field" class="field mode-field" hidden><span class="field-label">Tryb pytań</span>
+                  <select id="mode-input"><option value="direct">Direct</option><option value="shared">Shared KV</option></select>
+                </label>
+              </div>
+              <p id="scorer-help" class="settings-note">SemIf porównuje logity liter A/B/C w ostatniej pozycji. Prawdopodobieństwa dotyczą tylko wyświetlonych opcji.</p>
             </div>
-            <p id="scorer-help" class="settings-note">SemIf porównuje logity liter A/B/C w ostatniej pozycji. Prawdopodobieństwa dotyczą tylko wyświetlonych opcji.</p>
             <details class="advanced"><summary>Autoryzacja API <span aria-hidden="true">⌄</span></summary>
-              <label class="field-label" for="api-key">Klucz Bearer dla /v1/systemone</label>
+              <label class="field-label" for="api-key">Klucz Bearer dla /v1/systemone i /v1/cases</label>
               <input id="api-key" type="password" autocomplete="off" placeholder="Opcjonalnie · pozostaje w tej karcie">
             </details>
           </section>
 
           <div class="action-area">
-            <button id="run-button" class="run-button" type="submit"><span class="run-symbol" aria-hidden="true">↗</span><span id="run-label">Oceń decyzję</span></button>
+            <button id="run-button" class="run-button" type="submit"><span class="run-symbol" aria-hidden="true">↗</span><span id="run-label">Oceń JSON</span></button>
             <span class="action-hint">Model nie generuje odpowiedzi tekstowej.</span>
           </div>
         </form>
@@ -113,7 +137,7 @@
             <div class="empty-orbit" aria-hidden="true"><span class="orbit-ring ring-one"></span><span class="orbit-ring ring-two"></span><span class="orbit-core">◇</span></div>
             <span class="empty-kicker">READY WHEN YOU ARE</span>
             <h3>Decyzja zaczyna się tutaj.</h3>
-            <p>Uzupełnij stan, pytanie i opcje, a potem uruchom scoring. Zobaczysz rozkład, pewność i metryki wykonania.</p>
+            <p>Wklej JSON ze stanem, pytaniami i opcjami. Zobaczysz rozkład decyzji, pewność i metryki wykonania.</p>
           </div>
           <div id="result-content" class="result-content" aria-live="polite" hidden></div>
           <div id="result-actions" class="result-actions" hidden>

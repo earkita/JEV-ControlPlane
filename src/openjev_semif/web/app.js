@@ -9,7 +9,7 @@
     branch_s: "Gałąź KV", scoring_s: "Scoring", total_s: "Łącznie",
   };
   const ui = {
-    form: $("#decision-form"), state: $("#state-input"), stateJson: $("#state-json"),
+    form: $("#decision-form"), json: $("#json-input"), state: $("#state-input"), stateJson: $("#state-json"),
     singleQuestion: $("#single-question"), singleOptions: $("#single-options"),
     questions: $("#question-list"), scorer: $("#scorer-input"),
     temperature: $("#temperature-input"), mode: $("#mode-input"),
@@ -18,7 +18,7 @@
     badge: $("#output-badge"), actions: $("#result-actions"),
     run: $("#run-button"), runLabel: $("#run-label"),
   };
-  let activeTab = "single";
+  let activeTab = "json";
   let lastResult = null;
   let backendKind = "torch";
   let backendDefaultTemperature = 1.0;
@@ -112,21 +112,33 @@
     ui.badge.textContent = "AWAITING INPUT";
     ui.badge.className = "output-badge";
     $("h3", ui.empty).textContent = "Decyzja zaczyna się tutaj.";
-    $("p", ui.empty).textContent = "Uzupełnij stan, pytanie i opcje, a potem uruchom scoring. Zobaczysz rozkład, pewność i metryki wykonania.";
+    $("p", ui.empty).textContent = activeTab === "json"
+      ? "Wklej JSON ze stanem, pytaniami i opcjami. Zobaczysz rozkład decyzji, pewność i metryki wykonania."
+      : "Uzupełnij stan, pytanie i opcje, a potem uruchom scoring. Zobaczysz rozkład, pewność i metryki wykonania.";
+  }
+
+  function runLabel() {
+    return activeTab === "json" ? "Oceń JSON" : activeTab === "single" ? "Oceń decyzję" : "Oceń pytania";
   }
 
   function setTab(tab) {
-    if (tab !== activeTab) clearResult();
-    activeTab = tab;
-    for (const name of ["single", "batch"]) {
+    if (tab !== activeTab) {
+      activeTab = tab;
+      clearResult();
+    }
+    for (const name of ["json", "single", "batch"]) {
       const selected = name === tab;
       const button = $(`#tab-${name}`);
       button.classList.toggle("active", selected);
       button.setAttribute("aria-selected", String(selected));
       $(`#panel-${name}`).hidden = !selected;
     }
+    $("#state-section").hidden = tab === "json";
+    $("#manual-settings").hidden = tab === "json";
+    $("#settings-heading").textContent = tab === "json" ? "Autoryzacja" : "Ustawienia";
+    $("#load-preset").hidden = tab === "json";
     $("#mode-field").hidden = tab !== "batch";
-    ui.runLabel.textContent = tab === "single" ? "Oceń decyzję" : "Oceń pytania";
+    ui.runLabel.textContent = runLabel();
   }
 
   function updateScorer() {
@@ -200,7 +212,31 @@
     });
   }
 
+  function requestFromJson() {
+    const raw = ui.json.value.trim();
+    if (!raw) throw new Error("Wklej JSON ze stanem, pytaniami i opcjami.");
+    let data;
+    try { data = JSON.parse(raw); }
+    catch (error) { throw new Error(`Niepoprawny JSON: ${error.message}`); }
+    if (data === null || typeof data !== "object" || Array.isArray(data))
+      throw new Error("Główną wartością JSON musi być obiekt.");
+    if (Object.hasOwn(data, "cases"))
+      return { path: "/v1/cases/evaluate", body: data };
+    if (Object.hasOwn(data, "state") && Array.isArray(data.questions) && data.id) {
+      const { scorer, mode, temperature, ...singleCase } = data;
+      return { path: "/v1/cases/evaluate", body: {
+        cases: [singleCase], scorer, mode, temperature,
+      }};
+    }
+    if (Object.hasOwn(data, "state") && data.questions && !Array.isArray(data.questions))
+      return { path: "/v1/systemone", body: { mode: "direct", ...data } };
+    if (Object.hasOwn(data, "state") && Object.hasOwn(data, "question") && Object.hasOwn(data, "options"))
+      return { path: "/score", body: data };
+    throw new Error("Nie rozpoznano formatu. Wklej {cases:[...]}, pojedynczy przypadek z id i questions, /v1/systemone albo /score.");
+  }
+
   function buildRequest() {
+    if (activeTab === "json") return requestFromJson();
     const state = readState();
     const temperature = Number(ui.temperature.value);
     if (!Number.isFinite(temperature) || temperature <= 0)
@@ -336,9 +372,9 @@
     const root = ui.result;
     const count = Object.keys(data.answers).length;
     const kicker = element("div", "result-kicker");
-    kicker.append(element("span", "", "SYSTEMONE / RESULTS"), element("span", "", payload.mode.toUpperCase()));
+    kicker.append(element("span", "", "SYSTEMONE / RESULTS"), element("span", "", (payload.mode || "direct").toUpperCase()));
     root.append(kicker, element("h3", "winner", `${count} ${count === 1 ? "decyzja" : "decyzje"}`),
-      element("p", "result-subtitle", `Wspólny stan · ${data.model} · ${payload.scorer}`));
+      element("p", "result-subtitle", `Wspólny stan · ${data.model} · ${Object.values(data.answers)[0]?.scorer || payload.scorer || "—"}`));
     const summary = element("div", "batch-summary");
     addMetric(summary, "Pytania", count);
     addMetric(summary, "Tokeny łącznie", data.usage.input_tokens);
@@ -381,6 +417,60 @@
     root.append(element("p", "settings-note", `Rewizja modelu: ${data.model_revision}. Prawdopodobieństwa są warunkowe względem widocznych opcji.`));
   }
 
+  function renderCases(data, payload) {
+    const root = ui.result;
+    const count = data.summary.question_count;
+    const kicker = element("div", "result-kicker");
+    kicker.append(element("span", "", "CASES / RESULTS"), element("span", "", `${data.summary.case_count} CASES`));
+    root.append(kicker, element("h3", "winner", `${count} ${count === 1 ? "decyzja" : "decyzje"}`),
+      element("p", "result-subtitle", `Model: ${data.model} · Dopasowanie do opcjonalnych etykiet`));
+    const summary = element("div", "batch-summary");
+    addMetric(summary, "Przypadki", data.summary.case_count);
+    addMetric(summary, "Pytania", count);
+    addMetric(summary, "Etykiety", data.summary.labelled_count);
+    addMetric(summary, "Zgodność", data.summary.accuracy == null ? "—" : formatPercent(data.summary.accuracy));
+    root.append(summary);
+    for (const caseResult of data.cases) {
+      const source = payload.cases.find((item) => item.id === caseResult.id);
+      const section = element("section", "case-result");
+      section.append(element("h3", "case-heading", caseResult.id));
+      if (source) {
+        const state = element("details", "case-state");
+        state.append(element("summary", "", "Pokaż stan"),
+          element("pre", "", typeof source.state === "string" ? source.state : JSON.stringify(source.state, null, 2)));
+        section.append(state);
+      }
+      for (const item of caseResult.questions) {
+        const question = source?.questions.find((entry) => entry.id === item.id);
+        const descriptions = Object.fromEntries((question?.options || []).map((option) => [option.id, option.description]));
+        const answer = item.answer;
+        const card = element("article", "answer-card");
+        const cardTop = element("div", "result-kicker");
+        cardTop.append(element("span", "", item.id), element("span", "", answer.scorer.toUpperCase()));
+        const match = item.matched === null ? "Bez etykiety" : item.matched ? "Zgodne z etykietą" : "Różni się od etykiety";
+        const matchKind = item.matched === null ? "unlabelled" : item.matched ? "matched" : "mismatched";
+        card.append(cardTop, element("h4", "winner", descriptions[answer.choice] || answer.choice),
+          element("p", "result-subtitle", question?.question || item.id),
+          element("span", `match-badge ${matchKind}`, match));
+        if (item.expected_option !== null)
+          card.append(element("p", "expected-note", `Oczekiwano: ${descriptions[item.expected_option] || item.expected_option}`));
+        renderProbabilities(card, Object.entries(answer.probabilities).map(([id, probability]) => ({
+          id, description: descriptions[id] || id, probability,
+        })), answer.choice);
+        const meta = element("div", "meta-list");
+        addMeta(meta, "Pewność", formatPercent(answer.confidence));
+        addMeta(meta, "Czas łącznie", formatTime(answer.timings.total_s));
+        addMeta(meta, "Prefill", formatTime(answer.timings.prefill_s));
+        addMeta(meta, "Tokeny", answer.input_tokens);
+        addMeta(meta, "Prompt hash", answer.prompt_hash);
+        card.append(meta);
+        section.append(card);
+      }
+      root.append(section);
+    }
+    root.append(element("p", "settings-note", `Rewizja modelu: ${data.model_revision}. Zgodność z etykietami wygenerowanymi przez AI nie jest pomiarem jakości bez ich weryfikacji.`));
+  }
+
   function showError(message) {
     ui.error.textContent = message;
     ui.error.hidden = false;
@@ -394,7 +484,10 @@
   function detailMessage(body, status) {
     if (typeof body?.detail === "string") return body.detail;
     if (Array.isArray(body?.detail))
-      return body.detail.map((entry) => entry.msg || JSON.stringify(entry)).join("\n");
+      return body.detail.map((entry) => {
+        const path = Array.isArray(entry.loc) ? entry.loc.filter((part) => part !== "body").join(".") : "";
+        return `${path ? `${path}: ` : ""}${entry.msg || JSON.stringify(entry)}`;
+      }).join("\n");
     return `Serwer zwrócił HTTP ${status}.`;
   }
 
@@ -424,6 +517,7 @@
       lastResult = body;
       ui.result.replaceChildren();
       if (request.path === "/score") renderSingle(body);
+      else if (request.path === "/v1/cases/evaluate") renderCases(body, request.body);
       else renderBatch(body, request.body);
       ui.empty.hidden = true;
       ui.result.hidden = false;
@@ -435,7 +529,7 @@
       showError(error.message || "Nie udało się połączyć z serwerem.");
     } finally {
       ui.run.disabled = false;
-      ui.runLabel.textContent = activeTab === "single" ? "Oceń decyzję" : "Oceń pytania";
+      ui.runLabel.textContent = runLabel();
     }
   }
 
@@ -487,6 +581,7 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  $("#tab-json").addEventListener("click", () => setTab("json"));
   $("#tab-single").addEventListener("click", () => setTab("single"));
   $("#tab-batch").addEventListener("click", () => setTab("batch"));
   $("#load-preset").addEventListener("click", loadPreset);
@@ -496,7 +591,14 @@
   $("#copy-json").addEventListener("click", copyResult);
   $("#download-json").addEventListener("click", downloadResult);
   ui.scorer.addEventListener("change", updateScorer);
+  ui.json.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      if (!ui.run.disabled) ui.form.requestSubmit();
+    }
+  });
   ui.form.addEventListener("submit", runDecision);
   loadPreset();
+  setTab("json");
   refreshHealth();
 })();

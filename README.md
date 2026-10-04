@@ -120,7 +120,7 @@ For AI-generated test inputs, send arrays of cases with a `state`, named questio
 
 ## Web UI
 
-The server also serves a built-in decision workbench at **`http://127.0.0.1:8000/ui`** (or `/`; the 27B profile uses port 8002). It has a single-decision form for `/score` and a multi-question form for `/v1/systemone`, including `choice`, `score`, and `noul` questions. On Torch, choose SemIf or likelihood and direct or shared mode. On GGUF, the UI selects SemIf direct and reads the default temperature from `/health`. Results show option distributions, confidence, timings, token counts, prompt hashes, and model revision; JSON can be copied or downloaded.
+The server also serves a built-in decision workbench at **`http://127.0.0.1:8000/ui`** (or `/`; the 27B profile uses port 8002). Its default **Wklej JSON** tab accepts a `cases` batch, one case, `/score` input or `/v1/systemone` input and draws the resulting decisions and probability bars. Manual single-decision and multi-question forms remain available. On Torch, choose SemIf or likelihood and direct or shared mode. On GGUF, the UI selects SemIf direct and reads the default temperature from `/health`. Results show option distributions, confidence, timings, token counts, prompt hashes, and model revision; JSON can be copied or downloaded.
 
 The UI uses local HTML/CSS/JavaScript assets in `src/openjev_semif/web/`. It is served by the same FastAPI process and does not load a second model, need Gradio, or require a frontend build. The API documentation remains available at `/docs`. If `OPENJEV_API_KEY` protects `/v1/systemone`, enter the key in the UI's authorization field for that browser tab; it is not saved by the page.
 
