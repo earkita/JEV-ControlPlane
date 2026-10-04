@@ -23,6 +23,29 @@ CUDA_VISIBLE_DEVICES=0 .venv/bin/openjev-semif serve \
 
 The Hugging Face model revision is resolved to a commit before loading and is returned in responses. Set `--revision` to pin one explicitly. `MODEL`, `REVISION`, `BACKEND`, `DEVICE`, `DTYPE`, `SCORER`, `MAX_CONTEXT`, `TEMPERATURE`, `CALIBRATION_PROFILE`, `HOST`, and `PORT` are supported environment settings. `--config settings.json` may supply the same fields; CLI flags override config and environment values.
 
+### Keep model weights outside the repository
+
+For an explicit local model directory, download the pinned snapshot once:
+
+```bash
+hf download Qwen/Qwen3.5-4B \
+  --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a \
+  --local-dir "$HOME/ai/models/qwen/Qwen3.5"
+```
+
+Then start the service from those local files:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 .venv/bin/openjev-semif serve \
+  --model "$HOME/ai/models/qwen/Qwen3.5" \
+  --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a \
+  --backend torch --scorer semif --device cuda --dtype bfloat16 --port 8000
+```
+
+The `--revision` value records the upstream snapshot in responses when `--model` is a local path. The model directory is outside Git; `--model Qwen/Qwen3.5-4B` remains available and uses the normal Hugging Face cache.
+
+## API example
+
 ```bash
 curl -s localhost:8000/v1/systemone -H 'content-type: application/json' -d '{
   "state": "Build failed after enabling a new MXFP4 kernel.",
