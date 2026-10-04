@@ -1,10 +1,11 @@
 """Single-model HTTP service with startup/shutdown lifecycle."""
 from __future__ import annotations
 import os
+from hashlib import sha256
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Header
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from .schemas import (ScoreRequest, ScoreResponse, SystemOneRequest, SystemOneResponse,
                       HealthResponse, OptionIn, CaseBatchRequest, CaseBatchResponse,
@@ -42,7 +43,11 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
 
     @app.get("/ui", include_in_schema=False)
     def ui():
-        return FileResponse(web_dir / "index.html")
+        markup = (web_dir / "index.html").read_text(encoding="utf-8")
+        for asset in ("style.css", "app.js"):
+            version = sha256((web_dir / asset).read_bytes()).hexdigest()[:12]
+            markup = markup.replace(f'/ui/assets/{asset}"', f'/ui/assets/{asset}?v={version}"')
+        return HTMLResponse(markup, headers={"Cache-Control": "no-store"})
 
     def get_backend():
         if state["backend"] is None: raise HTTPException(503, "model loading")
