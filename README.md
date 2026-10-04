@@ -15,13 +15,29 @@ For CUDA wheels, follow the [PyTorch installation selector](https://pytorch.org/
 
 ## Run on RTX 3090
 
+The repository launcher reads [config/serve.json](config/serve.json). Its default model path is `~/ai/models/qwen/Qwen3.5`, with the pinned revision, CUDA, BF16, SemIf, and port 8000:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 ./launch.sh
+```
+
+Override any default with environment variables or CLI flags. The order is **repository config < environment < CLI**:
+
+```bash
+PORT=8001 ./launch.sh
+./launch.sh --port 8002 --scorer likelihood
+OPENJEV_CONFIG=/path/to/serve.json ./launch.sh --port 8003
+```
+
+The launcher finds the repository's `.venv/bin/openjev-semif`, or an installed `openjev-semif` on `PATH`. It can be run from any working directory. The equivalent direct CLI command is:
+
 ```bash
 CUDA_VISIBLE_DEVICES=0 .venv/bin/openjev-semif serve \
   --model Qwen/Qwen3.5-4B --backend torch --scorer semif \
   --device cuda --dtype bfloat16 --port 8000
 ```
 
-The Hugging Face model revision is resolved to a commit before loading and is returned in responses. Set `--revision` to pin one explicitly. `MODEL`, `REVISION`, `BACKEND`, `DEVICE`, `DTYPE`, `SCORER`, `MAX_CONTEXT`, `TEMPERATURE`, `CALIBRATION_PROFILE`, `HOST`, and `PORT` are supported environment settings. `--config settings.json` may supply the same fields; CLI flags override config and environment values.
+The Hugging Face model revision is resolved to a commit before loading and is returned in responses. Set `--revision` to pin one explicitly. `MODEL`, `REVISION`, `BACKEND`, `DEVICE`, `DTYPE`, `SCORER`, `MAX_CONTEXT`, `TEMPERATURE`, `CALIBRATION_PROFILE`, `HOST`, and `PORT` are supported environment settings. `--config settings.json` may supply the same fields.
 
 ### Keep model weights outside the repository
 

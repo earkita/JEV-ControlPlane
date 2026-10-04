@@ -25,12 +25,14 @@ class Settings:
         if self.temperature <= 0: raise ValueError("temperature must be positive")
 
     @classmethod
-    def from_env(cls, **overrides):
-        values = {field: os.environ.get(field.upper()) for field in cls.__dataclass_fields__}
-        values = {k: v for k, v in values.items() if v is not None}
+    def from_env(cls, config=None, **overrides):
+        values = dict(config or {})
+        values.update({field: value for field in cls.__dataclass_fields__
+                       if (value := os.environ.get(field.upper())) is not None})
         values.update({k: v for k, v in overrides.items() if v is not None})
         for key in ("max_context", "port"):
             if key in values: values[key] = int(values[key])
         if "temperature" in values: values["temperature"] = float(values["temperature"])
+        if "model" in values: values["model"] = os.path.expanduser(values["model"])
         result = cls(**values)
         return result

@@ -1,0 +1,12 @@
+{
+  "model": "~/ai/models/qwen/Qwen3.5",
+  "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+  "backend": "torch",
+  "scorer": "semif",
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "max_context": 4096,
+  "temperature": 1.0,
+  "host": "127.0.0.1",
+  "port": 8000
+}

@@ -44,6 +44,13 @@ def parser():
     return p
 
 
+def load_settings(args):
+    config = json.loads(args.config.read_text()) if args.config else {}
+    cli_values = {k: v for k, v in vars(args).items()
+                  if k in Settings.__dataclass_fields__ and v is not None}
+    return Settings.from_env(config=config, **cli_values)
+
+
 def main(argv=None):
     args = parser().parse_args(argv)
     if args.command == "client":
@@ -61,10 +68,7 @@ def main(argv=None):
                 result = client.systemone(json.loads(args.input.read_text()))
         print(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
         return
-    values = json.loads(args.config.read_text()) if args.config else {}
-    values.update({k: v for k, v in vars(args).items()
-                   if k in Settings.__dataclass_fields__ and v is not None})
-    settings = Settings.from_env(**values)
+    settings = load_settings(args)
     if args.command == "serve":
         import uvicorn
         from .api.server import create_app

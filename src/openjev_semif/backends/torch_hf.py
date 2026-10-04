@@ -21,6 +21,8 @@ class TorchHFBackend:
         if self.device == "cuda" and dtype == torch.bfloat16 and not torch.cuda.is_bf16_supported():
             raise RuntimeError("CUDA device does not support bfloat16")
         local = Path(settings.model).exists()
+        if Path(settings.model).is_absolute() and not local:
+            raise FileNotFoundError(f"Local model directory does not exist: {settings.model}")
         revision = settings.revision or ("local" if local else model_info(settings.model).sha)
         self.model_revision = revision
         self.tokenizer_revision = revision
