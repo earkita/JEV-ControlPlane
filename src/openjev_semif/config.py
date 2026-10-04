@@ -13,16 +13,22 @@ class Settings:
     scorer: str = "semif"
     max_context: int = 4096
     temperature: float = 1.0
+    noul_temperature: float = 1.829074
     calibration_profile: str | None = None
+    backend_url: str | None = None
+    tokenizer_path: str | None = None
+    tokenizer_revision: str | None = None
     host: str = "127.0.0.1"
     port: int = 8000
 
     def __post_init__(self):
-        if self.backend != "torch": raise ValueError("backend must be torch")
+        if self.backend not in ("torch", "llama_cpp"):
+            raise ValueError("backend must be torch or llama_cpp")
         if self.scorer not in ("semif", "likelihood"):
             raise ValueError("scorer must be semif or likelihood")
         if self.max_context < 2: raise ValueError("max_context must be >= 2")
         if self.temperature <= 0: raise ValueError("temperature must be positive")
+        if self.noul_temperature <= 0: raise ValueError("noul_temperature must be positive")
 
     @classmethod
     def from_env(cls, config=None, **overrides):
@@ -33,6 +39,9 @@ class Settings:
         for key in ("max_context", "port"):
             if key in values: values[key] = int(values[key])
         if "temperature" in values: values["temperature"] = float(values["temperature"])
+        if "noul_temperature" in values: values["noul_temperature"] = float(values["noul_temperature"])
         if "model" in values: values["model"] = os.path.expanduser(values["model"])
+        for key in ("tokenizer_path", "calibration_profile"):
+            if values.get(key): values[key] = os.path.expanduser(values[key])
         result = cls(**values)
         return result

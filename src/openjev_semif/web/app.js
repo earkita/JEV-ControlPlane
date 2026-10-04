@@ -20,6 +20,9 @@
   };
   let activeTab = "single";
   let lastResult = null;
+  let backendKind = "torch";
+  let backendDefaultTemperature = 1.0;
+  let healthSeen = false;
 
   function element(tag, className = "", value = "") {
     const item = document.createElement(tag);
@@ -127,12 +130,14 @@
   }
 
   function updateScorer() {
+    $("#scorer-input option[value='likelihood']").disabled = backendKind === "llama_cpp";
+    if (backendKind === "llama_cpp") ui.scorer.value = "semif";
     const semif = ui.scorer.value === "semif";
     $("#scorer-help").textContent = semif
       ? "SemIf porównuje logity liter A/B/C w ostatniej pozycji. Prawdopodobieństwa dotyczą tylko wyświetlonych opcji."
       : "Likelihood ocenia P(tekst opcji | kontekst). Wyniki surowe mają inne znaczenie niż logity SemIf.";
-    $("#mode-input option[value='shared']").disabled = !semif;
-    if (!semif && ui.mode.value === "shared") ui.mode.value = "direct";
+    $("#mode-input option[value='shared']").disabled = !semif || backendKind === "llama_cpp";
+    if ((!semif || backendKind === "llama_cpp") && ui.mode.value === "shared") ui.mode.value = "direct";
   }
 
   function loadPreset() {
@@ -160,7 +165,7 @@
       ],
     });
     ui.scorer.value = "semif";
-    ui.temperature.value = "1.00";
+    ui.temperature.value = backendDefaultTemperature.toFixed(2);
     ui.mode.value = "direct";
     setTab("single");
     updateScorer();
@@ -441,6 +446,11 @@
       const response = await fetch("/health", { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const health = await response.json();
+      backendKind = health.backend;
+      backendDefaultTemperature = Number(health.default_temperature) || 1.0;
+      if (!healthSeen) ui.temperature.value = backendDefaultTemperature.toFixed(2);
+      healthSeen = true;
+      updateScorer();
       connection.className = `connection ${health.status === "ready" ? "ready" : ""}`;
       status.textContent = health.status === "ready" ? "MODEL READY" : "Ładowanie modelu";
       $("#model-name").textContent = health.model;

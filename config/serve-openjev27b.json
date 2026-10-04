@@ -1,0 +1,16 @@
+{
+  "model": "~/ai/models/openjev/OpenJev-27B-Q4_K_M/OpenJev-Q4_K_M.gguf",
+  "revision": "7c0a4c624342dd283f8d1bd215fbbe72cb0059f7",
+  "backend": "llama_cpp",
+  "backend_url": "http://127.0.0.1:8091",
+  "tokenizer_path": "~/ai/models/openjev/OpenJev-27B-Q4_K_M/tokenizer",
+  "tokenizer_revision": "5ec9e5fd2f80a6fff386779b1e5ac7e389971889",
+  "scorer": "semif",
+  "device": "cuda",
+  "dtype": "q4_k_m",
+  "max_context": 8192,
+  "temperature": 0.85,
+  "noul_temperature": 1.829074,
+  "host": "127.0.0.1",
+  "port": 8002
+}

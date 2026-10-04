@@ -52,6 +52,7 @@ class HealthResponse(BaseModel):
     scorer: str
     status: Literal["ready", "loading"]
     model_revision: str | None = None
+    default_temperature: float = 1.0
 
 class OptionScoreOut(BaseModel):
     option: str

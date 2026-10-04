@@ -10,6 +10,7 @@ from .schemas import (ScoreRequest, ScoreResponse, SystemOneRequest, SystemOneRe
                       HealthResponse, OptionIn)
 from .systemone import decision_for, answer_for
 from ..backends.registry import create_backend
+from ..backends.llama_cpp import BackendUnavailable
 from ..config import Settings
 from ..scoring.base import Decision, Option
 from ..scoring.likelihood import LikelihoodScorer
@@ -27,6 +28,7 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
         if state["backend"] is None: state["backend"] = create_backend(settings)
         state["default_temperature"] = effective_temperature(settings, state["backend"])
         yield
+        if hasattr(state["backend"], "close"): state["backend"].close()
         state["backend"] = None
 
     app = FastAPI(title="OpenJEV-SemIf", version="0.1.0", lifespan=lifespan)
@@ -54,7 +56,8 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
         return HealthResponse(model=settings.model, backend=settings.backend,
             device=model.device if model else settings.device, dtype=model.dtype if model else settings.dtype,
             scorer=settings.scorer, status="ready" if model else "loading",
-            model_revision=model.model_revision if model else None)
+            model_revision=model.model_revision if model else None,
+            default_temperature=state["default_temperature"])
 
     @app.post("/score", response_model=ScoreResponse)
     def score(req: ScoreRequest):
@@ -63,10 +66,17 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
                    else Option(x, x) for x in req.options]
         if len({x.id for x in options}) != len(options): raise HTTPException(400, "option ids must be unique")
         try:
-            result = scorer_for(req.scorer or settings.scorer, model).score(
-                Decision(req.state, req.question, options), req.temperature or state["default_temperature"])
+            scorer = req.scorer or settings.scorer
+            decision = Decision(req.state, req.question, options)
+            temperature = req.temperature or state["default_temperature"]
+            if hasattr(model, "score_decision"):
+                if scorer != "semif": raise ValueError("llama_cpp backend supports semif only")
+                result = model.score_decision(decision, temperature)
+            else:
+                result = scorer_for(scorer, model).score(decision, temperature)
             return result.as_dict()
         except ValueError as exc: raise HTTPException(400, str(exc)) from exc
+        except BackendUnavailable as exc: raise HTTPException(502, str(exc)) from exc
 
     @app.post("/v1/systemone", response_model=SystemOneResponse)
     def systemone(req: SystemOneRequest, authorization: str | None = Header(default=None)):
@@ -74,6 +84,10 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
         if api_key and authorization != f"Bearer {api_key}": raise HTTPException(401, "invalid API key")
         model = get_backend()
         scorer = req.scorer or settings.scorer
+        if hasattr(model, "score_decision") and scorer != "semif":
+            raise HTTPException(400, "llama_cpp backend supports semif only")
+        if hasattr(model, "score_decision") and req.mode == "shared":
+            raise HTTPException(400, "shared mode is not yet verified for llama_cpp backend")
         if req.mode == "shared" and scorer != "semif":
             raise HTTPException(400, "shared mode currently supports semif only")
         questions = list(req.questions.items())
@@ -81,8 +95,12 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
         try:
             temperature = req.temperature or state["default_temperature"]
             if req.mode == "shared": results = score_shared(model, decisions, temperature)
+            elif hasattr(model, "score_decision"):
+                results = [model.score_decision(d, temperature, q.type)
+                           for (_, q), d in zip(questions, decisions)]
             else: results = [scorer_for(scorer, model).score(d, temperature) for d in decisions]
         except ValueError as exc: raise HTTPException(400, str(exc)) from exc
+        except BackendUnavailable as exc: raise HTTPException(502, str(exc)) from exc
         answers = {qid: answer_for(q, result) for (qid, q), result in zip(questions, results)}
         return {"model": model.model_name, "model_revision": model.model_revision,
                 "answers": answers, "usage": {"input_tokens": sum(r.input_tokens for r in results),

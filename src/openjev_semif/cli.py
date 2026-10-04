@@ -13,11 +13,12 @@ def parser():
     for name in ("serve", "score", "bench", "eval"):
         x = sub.add_parser(name)
         x.add_argument("--config", type=Path)
-        for flag in ("model", "revision", "backend", "device", "dtype", "scorer", "host"):
+        for flag in ("model", "revision", "backend", "backend-url", "tokenizer-path", "tokenizer-revision", "device", "dtype", "scorer", "host"):
             x.add_argument("--" + flag)
         for flag in ("port", "max-context"):
             x.add_argument("--" + flag, type=int)
         x.add_argument("--temperature", type=float)
+        x.add_argument("--noul-temperature", type=float)
         if name == "score":
             x.add_argument("--state", required=True)
             x.add_argument("--question", required=True)
@@ -83,9 +84,16 @@ def main(argv=None):
         from .scoring.semif import SemIfScorer
         from .scoring.likelihood import LikelihoodScorer
         decision = Decision(args.state, args.question, [Option(x, x) for x in args.option])
-        scorer = SemIfScorer(model) if settings.scorer == "semif" else LikelihoodScorer(model)
-        print(json.dumps(scorer.score(decision, temperature).as_dict(), indent=2))
+        if hasattr(model, "score_decision"):
+            if settings.scorer != "semif": raise ValueError("llama_cpp backend supports semif only")
+            result = model.score_decision(decision, temperature)
+        else:
+            scorer = SemIfScorer(model) if settings.scorer == "semif" else LikelihoodScorer(model)
+            result = scorer.score(decision, temperature)
+        print(json.dumps(result.as_dict(), indent=2))
         return
+    if hasattr(model, "score_decision"):
+        raise ValueError("bench and eval currently require the torch backend")
     from .benchmark import bench, evaluate
     output = bench(model, args.input, temperature, args.repeats) if args.command == "bench" else evaluate(model, args.input, settings.scorer, temperature)
     args.output.parent.mkdir(parents=True, exist_ok=True)
