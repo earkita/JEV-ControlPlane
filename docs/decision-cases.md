@@ -26,6 +26,8 @@ Start from [decision-cases.json](../examples/decision-cases.json). Against the r
 
 For a browser workflow, open `http://127.0.0.1:8002/ui`, keep the default **Wklej JSON** tab, paste the batch and select **Oceń JSON**. The panel groups decisions by case, shows each option's probability and marks agreement with optional labels. You can also paste a single case object or an existing `/score` or `/v1/systemone` request. The JSON document supplies its own scorer, mode and temperature when needed; otherwise the server defaults apply.
 
+Three additional synthetic examples can be pasted directly into that field: [several independent cases](../examples/ui-cases-demo.json), [one state with `choice`, `score`, and `noul`](../examples/ui-systemone-demo.json), and [a single `/score` decision](../examples/ui-score-demo.json). They demonstrate the JSON shapes and UI, not model quality.
+
 ```bash
 curl -sS http://127.0.0.1:8002/v1/cases/validate \
   -H 'Content-Type: application/json' \

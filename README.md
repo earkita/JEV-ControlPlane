@@ -118,6 +118,8 @@ Use `"mode":"shared"` with at least two questions over the same state to prefill
 
 For AI-generated test inputs, send arrays of cases with a `state`, named questions, candidate `{id, description}` options and an optional `expected_option`. `POST /v1/cases/validate` checks the JSON without inference; `POST /v1/cases/evaluate` scores it and compares labelled answers. See the [case API guide](docs/decision-cases.md) and [example batch](examples/decision-cases.json). Generated labels should be reviewed before using aggregate matches as an accuracy measurement.
 
+Ready-to-paste UI examples: [several cases](examples/ui-cases-demo.json), [typed SystemOne questions](examples/ui-systemone-demo.json), and [one `/score` decision](examples/ui-score-demo.json).
+
 ## Web UI
 
 The server also serves a built-in decision workbench at **`http://127.0.0.1:8000/ui`** (or `/`; the 27B profile uses port 8002). Its default **Wklej JSON** tab accepts a `cases` batch, one case, `/score` input or `/v1/systemone` input and draws the resulting decisions and probability bars. Manual single-decision and multi-question forms remain available. On Torch, choose SemIf or likelihood and direct or shared mode. On GGUF, the UI selects SemIf direct and reads the default temperature from `/health`. Results show option distributions, confidence, timings, token counts, prompt hashes, and model revision; JSON can be copied or downloaded.

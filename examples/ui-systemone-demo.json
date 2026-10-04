@@ -1,0 +1,32 @@
+{
+  "state": {
+    "service": "checkout",
+    "observation": "Po wdrożeniu nowej wersji odsetek błędów 500 wzrósł z 0,2% do 7%.",
+    "time_since_deploy_minutes": 5,
+    "rollback_available": true
+  },
+  "questions": {
+    "next_action": {
+      "type": "choice",
+      "instructions": "Jaki jest najlepszy następny krok operacyjny?",
+      "criteria": {
+        "rollback": "Cofnąć ostatni deploy i obserwować odsetek błędów",
+        "wait": "Czekać bez działania",
+        "delete_logs": "Usunąć logi błędów"
+      }
+    },
+    "severity": {
+      "type": "score",
+      "instructions": "Jak pilny jest incydent?",
+      "criteria": ["Brak incydentu", "Niska pilność", "Wysoka pilność"]
+    },
+    "regression": {
+      "type": "noul",
+      "instructions": "Czy odsetek błędów wzrósł po wdrożeniu?",
+      "criteria": {
+        "true": "Tak, wzrósł z 0,2% do 7%",
+        "false": "Nie, odsetek błędów pozostał bez zmian"
+      }
+    }
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "cases": [
+    {
+      "id": "ci-missing-env",
+      "state": {
+        "task": "Naprawić testy integracyjne",
+        "observation": "Testy przestały startować po zmianie konfiguracji CI.",
+        "log": "KeyError: DATABASE_URL",
+        "last_green_build": "przed zmianą konfiguracji"
+      },
+      "provenance": {"source": "handwritten-demo", "scenario": "ci"},
+      "questions": [
+        {
+          "id": "next_action",
+          "question": "Jaki jest najlepszy następny krok?",
+          "options": [
+            {"id": "inspect_config", "description": "Sprawdzić konfigurację CI i brakującą zmienną DATABASE_URL"},
+            {"id": "delete_tests", "description": "Usunąć testy integracyjne"},
+            {"id": "retry_unchanged", "description": "Uruchomić ponownie bez żadnych zmian"}
+          ],
+          "expected_option": "inspect_config"
+        },
+        {
+          "id": "verification",
+          "question": "Co potwierdzi, że naprawa działa?",
+          "options": [
+            {"id": "run_ci", "description": "Uruchomić testy integracyjne w CI z poprawną konfiguracją"},
+            {"id": "close_ticket", "description": "Zamknąć zadanie bez testów"}
+          ],
+          "expected_option": "run_ci"
+        }
+      ]
+    },
+    {
+      "id": "api-rate-limit",
+      "state": {
+        "request": "GET /v1/items",
+        "response_status": 429,
+        "retry_after_seconds": 12,
+        "attempt": 1
+      },
+      "provenance": {"source": "handwritten-demo", "scenario": "api-client"},
+      "questions": [
+        {
+          "id": "retry_policy",
+          "question": "Jak klient powinien wykonać kolejną próbę?",
+          "options": [
+            {"id": "wait", "description": "Poczekać co najmniej 12 sekund i ponowić żądanie"},
+            {"id": "loop", "description": "Ponawiać żądanie natychmiast w pętli"},
+            {"id": "ignore", "description": "Zignorować odpowiedź i uznać żądanie za udane"}
+          ],
+          "expected_option": "wait"
+        }
+      ]
+    },
+    {
+      "id": "agent-ambiguous-log",
+      "state": "Nowy deploy zwiększył liczbę błędów 500, ale logi nie wskazują jeszcze przyczyny. Dostępny jest bezpieczny rollback.",
+      "provenance": {"source": "handwritten-demo", "scenario": "agent-observability"},
+      "questions": [
+        {
+          "id": "first_step",
+          "question": "Co zrobić najpierw, aby ograniczyć wpływ awarii?",
+          "options": [
+            {"id": "rollback", "description": "Cofnąć ostatni deploy"},
+            {"id": "investigate", "description": "Najpierw przeanalizować logi i metryki"},
+            {"id": "wait", "description": "Nie podejmować działań i czekać"}
+          ]
+        }
+      ]
+    }
+  ]
+}
