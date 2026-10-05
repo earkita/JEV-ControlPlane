@@ -91,6 +91,11 @@ select option { background: #12242d; color: var(--text); }
 .json-input { min-height: 360px; font: 12px/1.6 var(--mono); tab-size: 2; }
 .check-row { display: inline-flex; align-items: center; gap: 9px; margin-top: 11px; color: var(--muted); font-size: 11px; cursor: pointer; }
 .check-row input { accent-color: var(--mint); }
+.image-preview { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 10px; border: 1px solid var(--line-soft); border-radius: 8px; }
+.image-preview img { width: 76px; height: 76px; object-fit: cover; border-radius: 5px; }
+.image-preview span { min-width: 0; flex: 1; color: var(--muted); font: 11px var(--mono); overflow-wrap: anywhere; }
+#image-input { display: block; max-width: 100%; color: var(--muted); font-size: 12px; }
+#image-input::file-selector-button { margin-right: 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--mint); cursor: pointer; }
 .tabs { display: flex; gap: 4px; padding: 4px; background: #0b1a22; border: 1px solid var(--line-soft); border-radius: 8px; margin-bottom: 23px; }
 .tab { flex: 1; min-width: 0; padding: 10px 8px; border: 0; border-radius: 5px; color: var(--muted); background: transparent; font-weight: 630; font-size: 12px; line-height: 1.35; }
 .tab:hover { color: var(--text); }
@@ -185,6 +190,8 @@ select option { background: #12242d; color: var(--text); }
 .state-preview { margin: 14px 0 22px; padding: 13px 14px; border: 1px solid var(--line-soft); border-radius: 8px; background: #0b1c25; }
 .state-preview .overline { display: block; margin-bottom: 8px; font-size: 9px; }
 .state-preview pre { max-height: 220px; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: #c2d5ce; font: 11px/1.55 var(--mono); }
+.state-images { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.state-images img { max-width: 100%; width: 180px; max-height: 180px; object-fit: contain; border-radius: 6px; border: 1px solid var(--line); background: #06141c; }
 .case-result { border-top: 1px solid var(--line-soft); padding-top: 19px; margin-top: 21px; }
 .case-heading { font: 12px var(--mono); color: var(--mint); margin: 0 0 9px; overflow-wrap: anywhere; }
 .match-badge { display: inline-block; padding: 3px 7px; border-radius: 4px; font: 10px var(--mono); border: 1px solid #617271; color: var(--muted); }

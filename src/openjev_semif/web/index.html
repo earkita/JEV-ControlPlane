@@ -99,8 +99,17 @@
             </div>
           </section>
 
+          <section class="form-section" aria-labelledby="image-heading">
+            <div class="section-heading"><span class="step">03</span><h3 id="image-heading">Obraz</h3><span class="section-hint">Winnow vision</span></div>
+            <label class="field-label" for="image-input">Dodaj zdjęcie do stanu</label>
+            <input id="image-input" type="file" accept="image/png,image/jpeg,image/webp">
+            <p id="image-help" class="settings-note">PNG, JPEG lub WebP, maksymalnie 8 MiB. Model oceni obraz według pytań i dostępnych opcji.</p>
+            <button id="image-preset" type="button" class="subtle-button">Wczytaj przykład rozpoznawania</button>
+            <div id="image-preview" class="image-preview" hidden><img id="image-preview-img" alt="Podgląd wybranego obrazu"><span id="image-preview-name"></span><button id="image-remove" type="button" class="subtle-button">Usuń</button></div>
+          </section>
+
           <section class="form-section settings-section" aria-labelledby="settings-heading">
-            <div class="section-heading"><span class="step">03</span><h3 id="settings-heading">Autoryzacja</h3></div>
+            <div class="section-heading"><span class="step">04</span><h3 id="settings-heading">Autoryzacja</h3></div>
             <div id="manual-settings" hidden>
               <div class="settings-grid">
                 <label class="field"><span class="field-label">Scorer</span>

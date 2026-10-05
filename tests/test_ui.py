@@ -15,6 +15,8 @@ def test_ui_is_served_with_api(backend, settings):
         assert 'id="panel-batch"' in page.text
         assert 'id="panel-json"' in page.text
         assert 'id="json-input"' in page.text
+        assert 'id="image-input"' in page.text
+        assert 'id="image-preset"' in page.text
         assert page.headers["cache-control"] == "no-store"
         css = client.get("/ui/assets/style.css")
         script = client.get("/ui/assets/app.js")

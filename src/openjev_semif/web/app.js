@@ -17,11 +17,14 @@
     empty: $("#result-empty"), error: $("#error-box"),
     badge: $("#output-badge"), actions: $("#result-actions"),
     run: $("#run-button"), runLabel: $("#run-label"),
+    image: $("#image-input"), imagePreview: $("#image-preview"),
   };
   let activeTab = "json";
   let lastResult = null;
   let backendKind = "torch";
   let backendDefaultTemperature = 1.0;
+  let visionEnabled = false;
+  let imageObjectUrl = null;
   let healthSeen = false;
 
   function element(tag, className = "", value = "") {
@@ -142,14 +145,38 @@
   }
 
   function updateScorer() {
-    $("#scorer-input option[value='likelihood']").disabled = backendKind === "llama_cpp";
-    if (backendKind === "llama_cpp") ui.scorer.value = "semif";
+    const gguf = backendKind === "llama_cpp" || backendKind === "winnow";
+    $("#scorer-input option[value='likelihood']").disabled = gguf;
+    if (gguf) ui.scorer.value = "semif";
     const semif = ui.scorer.value === "semif";
     $("#scorer-help").textContent = semif
       ? "SemIf porównuje logity liter A/B/C w ostatniej pozycji. Prawdopodobieństwa dotyczą tylko wyświetlonych opcji."
       : "Likelihood ocenia P(tekst opcji | kontekst). Wyniki surowe mają inne znaczenie niż logity SemIf.";
     $("#mode-input option[value='shared']").disabled = !semif || backendKind === "llama_cpp";
     if ((!semif || backendKind === "llama_cpp") && ui.mode.value === "shared") ui.mode.value = "direct";
+  }
+
+  function updateImagePreview() {
+    if (imageObjectUrl) URL.revokeObjectURL(imageObjectUrl);
+    const file = ui.image.files[0];
+    ui.imagePreview.hidden = !file;
+    if (!file) {
+      imageObjectUrl = null;
+      $("#image-preview-img").removeAttribute("src");
+      return;
+    }
+    imageObjectUrl = URL.createObjectURL(file);
+    $("#image-preview-img").src = imageObjectUrl;
+    $("#image-preview-name").textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MiB`;
+  }
+
+  function readImage(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("Nie udało się odczytać obrazu."));
+      reader.readAsDataURL(file);
+    });
   }
 
   function loadPreset() {
@@ -179,6 +206,22 @@
     ui.scorer.value = "semif";
     ui.temperature.value = backendDefaultTemperature.toFixed(2);
     ui.mode.value = "direct";
+    setTab("single");
+    updateScorer();
+    clearResult();
+  }
+
+  function loadImagePreset() {
+    ui.state.value = "Oceń zawartość załączonego zdjęcia.";
+    ui.stateJson.checked = false;
+    ui.singleQuestion.value = "Co najlepiej opisuje główny obiekt na zdjęciu?";
+    ui.singleOptions.replaceChildren();
+    for (const [id, description] of [
+      ["person", "Osoba"], ["animal", "Zwierzę"], ["vehicle", "Pojazd"],
+      ["building", "Budynek"], ["landscape", "Krajobraz"], ["other", "Coś innego"],
+    ]) addOption(ui.singleOptions, { id, description });
+    ui.scorer.value = "semif";
+    ui.temperature.value = backendDefaultTemperature.toFixed(2);
     setTab("single");
     updateScorer();
     clearResult();
@@ -346,11 +389,21 @@
     return typeof value === "string" ? value : JSON.stringify(value);
   }
 
-  function renderState(parent, state) {
+  function renderState(parent, state, images = []) {
     const box = element("section", "state-preview");
     const content = typeof state === "string" ? state : JSON.stringify(state, null, 2);
     box.append(element("span", "overline", "SYTUACJA WEJŚCIOWA"),
       element("pre", "", content));
+    if (images.length) {
+      const gallery = element("div", "state-images");
+      images.forEach((url, index) => {
+        const item = element("img");
+        item.src = url;
+        item.alt = `Obraz wejściowy ${index + 1}`;
+        gallery.append(item);
+      });
+      box.append(gallery);
+    }
     parent.append(box);
   }
 
@@ -360,7 +413,7 @@
     kicker.append(element("span", "", "TOP CHOICE"), element("span", "", data.scorer.toUpperCase()));
     root.append(kicker, element("h3", "winner", displayQuestion(payload.question, "Decyzja")),
       element("p", "result-subtitle", `Wybór: ${data.best}`));
-    renderState(root, payload.state);
+    renderState(root, payload.state, payload.images);
     renderProbabilities(root, data.options.map((option) => ({
       id: option.option, description: option.description, probability: option.probability,
       rawScore: option.raw_score,
@@ -392,7 +445,7 @@
     addMetric(summary, "Pytania", count);
     addMetric(summary, "Tokeny łącznie", data.usage.input_tokens);
     root.append(summary);
-    renderState(root, payload.state);
+    renderState(root, payload.state, payload.images);
     for (const [id, answer] of Object.entries(data.answers)) {
       const question = payload.questions[id];
       const descriptions = batchDescriptions(question);
@@ -448,7 +501,7 @@
       const source = payload.cases.find((item) => item.id === caseResult.id);
       const section = element("section", "case-result");
       section.append(element("h3", "case-heading", caseResult.id));
-      if (source) renderState(section, source.state);
+      if (source) renderState(section, source.state, source.images);
       for (const item of caseResult.questions) {
         const question = source?.questions.find((entry) => entry.id === item.id);
         const descriptions = Object.fromEntries((question?.options || []).map((option) => [option.id, option.description]));
@@ -518,6 +571,15 @@
     const apiKey = ui.apiKey.value.trim();
     if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
     try {
+      const file = ui.image.files[0];
+      if (file) {
+        if (!visionEnabled) throw new Error("Aktywny model nie obsługuje obrazów.");
+        if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 8 * 1024 * 1024)
+          throw new Error("Wybierz PNG, JPEG lub WebP o rozmiarze do 8 MiB.");
+        if (request.path === "/v1/cases/evaluate")
+          throw new Error("Dla przypadków testowych dodaj obrazy w polu images każdego przypadku.");
+        request.body.images = [...(request.body.images || []), await readImage(file)];
+      }
       const response = await fetch(request.path, {
         method: "POST", headers, body: JSON.stringify(request.body),
       });
@@ -550,6 +612,10 @@
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const health = await response.json();
       backendKind = health.backend;
+      visionEnabled = Boolean(health.vision);
+      $("#image-help").textContent = visionEnabled
+        ? "PNG, JPEG lub WebP, maksymalnie 8 MiB. Model oceni obraz według pytań i dostępnych opcji."
+        : "Aktywny model nie ma włączonej obsługi obrazów.";
       backendDefaultTemperature = Number(health.default_temperature) || 1.0;
       if (!healthSeen) ui.temperature.value = backendDefaultTemperature.toFixed(2);
       healthSeen = true;
@@ -594,11 +660,17 @@
   $("#tab-single").addEventListener("click", () => setTab("single"));
   $("#tab-batch").addEventListener("click", () => setTab("batch"));
   $("#load-preset").addEventListener("click", loadPreset);
+  $("#image-preset").addEventListener("click", loadImagePreset);
   $("#add-single-option").addEventListener("click", () => addOption(ui.singleOptions));
   $("#add-question").addEventListener("click", () => addQuestion());
   $("#refresh-health").addEventListener("click", refreshHealth);
   $("#copy-json").addEventListener("click", copyResult);
   $("#download-json").addEventListener("click", downloadResult);
+  ui.image.addEventListener("change", updateImagePreview);
+  $("#image-remove").addEventListener("click", () => {
+    ui.image.value = "";
+    updateImagePreview();
+  });
   ui.scorer.addEventListener("change", updateScorer);
   ui.json.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
