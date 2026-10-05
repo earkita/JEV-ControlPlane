@@ -1,0 +1,16 @@
+{
+  "model": "/mnt/ai/models/classifiers/Winnow-12B/Winnow-12B-Q8_0.gguf",
+  "revision": "abb21621114b10690259a7517fa59b153675176e",
+  "backend": "winnow",
+  "backend_url": "http://127.0.0.1:8091",
+  "tokenizer_revision": "gguf-sha256:b710efc4c0d048ee61eed92c5fef5ce323a4d17e7c51f9f0533cc72ae50818ea",
+  "projector_path": "/mnt/ai/models/classifiers/Winnow-12B/mmproj-Winnow-12B.gguf",
+  "scorer": "semif",
+  "device": "cuda",
+  "dtype": "q8_0",
+  "max_context": 8192,
+  "temperature": 1.0,
+  "noul_temperature": 1.0,
+  "host": "127.0.0.1",
+  "port": 8002
+}

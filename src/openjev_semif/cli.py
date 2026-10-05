@@ -13,7 +13,7 @@ def parser():
     for name in ("serve", "score", "bench", "eval"):
         x = sub.add_parser(name)
         x.add_argument("--config", type=Path)
-        for flag in ("model", "revision", "backend", "backend-url", "tokenizer-path", "tokenizer-revision", "device", "dtype", "scorer", "host"):
+        for flag in ("model", "revision", "backend", "backend-url", "tokenizer-path", "tokenizer-revision", "projector-path", "device", "dtype", "scorer", "host"):
             x.add_argument("--" + flag)
         for flag in ("port", "max-context"):
             x.add_argument("--" + flag, type=int)

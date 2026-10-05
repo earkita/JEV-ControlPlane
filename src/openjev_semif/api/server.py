@@ -64,11 +64,13 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
     @app.get("/health", response_model=HealthResponse)
     def health():
         model = state["backend"]
-        return HealthResponse(model=settings.model, backend=settings.backend,
+        name = model.model_name if model and settings.backend == "winnow" else settings.model
+        return HealthResponse(model=name, backend=settings.backend,
             device=model.device if model else settings.device, dtype=model.dtype if model else settings.dtype,
             scorer=settings.scorer, status="ready" if model else "loading",
             model_revision=model.model_revision if model else None,
-            default_temperature=state["default_temperature"])
+            default_temperature=state["default_temperature"],
+            vision=bool(model and getattr(model, "vision", False)))
 
     @app.post("/score", response_model=ScoreResponse)
     def score(req: ScoreRequest):
@@ -80,7 +82,12 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
             scorer = req.scorer or settings.scorer
             decision = Decision(req.state, req.question, options)
             temperature = req.temperature or state["default_temperature"]
-            if hasattr(model, "score_decision"):
+            if req.images and not getattr(model, "vision", False):
+                raise ValueError("active backend does not support image decisions")
+            if hasattr(model, "score_batch"):
+                if scorer != "semif": raise ValueError("Winnow backend supports semif only")
+                result = model.score_decision(decision, temperature, req.images)
+            elif hasattr(model, "score_decision"):
                 if scorer != "semif": raise ValueError("llama_cpp backend supports semif only")
                 result = model.score_decision(decision, temperature)
             else:
@@ -93,8 +100,10 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
         model = get_backend()
         scorer = req.scorer or settings.scorer
         if hasattr(model, "score_decision") and scorer != "semif":
-            raise HTTPException(400, "llama_cpp backend supports semif only")
-        if hasattr(model, "score_decision") and req.mode == "shared":
+            raise HTTPException(400, "GGUF backend supports semif only")
+        if req.images and not getattr(model, "vision", False):
+            raise HTTPException(400, "active backend does not support image decisions")
+        if hasattr(model, "score_decision") and not hasattr(model, "score_batch") and req.mode == "shared":
             raise HTTPException(400, "shared mode is not yet verified for llama_cpp backend")
         if req.mode == "shared" and scorer != "semif":
             raise HTTPException(400, "shared mode currently supports semif only")
@@ -102,7 +111,9 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
         decisions = [decision_for(req.state, q) for _, q in questions]
         try:
             temperature = req.temperature or state["default_temperature"]
-            if req.mode == "shared": results = score_shared(model, decisions, temperature)
+            if hasattr(model, "score_batch"):
+                results = model.score_batch(req.state, req.questions, temperature, req.images, req.mode)
+            elif req.mode == "shared": results = score_shared(model, decisions, temperature)
             elif hasattr(model, "score_decision"):
                 results = [model.score_decision(d, temperature, q.type)
                            for (_, q), d in zip(questions, decisions)]
@@ -141,7 +152,7 @@ def create_app(settings: Settings | None = None, backend=None) -> FastAPI:
             questions = {q.id: ChoiceQuestion(type="choice", instructions=q.question,
                 criteria={option.id: option.description for option in q.options})
                 for q in case.questions}
-            result = run_systemone(SystemOneRequest(state=case.state, questions=questions,
+            result = run_systemone(SystemOneRequest(state=case.state, images=case.images, questions=questions,
                 scorer=req.scorer, mode=req.mode, temperature=req.temperature))
             model_name = result["model"]
             model_revision = result["model_revision"]

@@ -18,12 +18,13 @@ class Settings:
     backend_url: str | None = None
     tokenizer_path: str | None = None
     tokenizer_revision: str | None = None
+    projector_path: str | None = None
     host: str = "127.0.0.1"
     port: int = 8000
 
     def __post_init__(self):
-        if self.backend not in ("torch", "llama_cpp"):
-            raise ValueError("backend must be torch or llama_cpp")
+        if self.backend not in ("torch", "llama_cpp", "winnow"):
+            raise ValueError("backend must be torch, llama_cpp or winnow")
         if self.scorer not in ("semif", "likelihood"):
             raise ValueError("scorer must be semif or likelihood")
         if self.max_context < 2: raise ValueError("max_context must be >= 2")
@@ -41,7 +42,7 @@ class Settings:
         if "temperature" in values: values["temperature"] = float(values["temperature"])
         if "noul_temperature" in values: values["noul_temperature"] = float(values["noul_temperature"])
         if "model" in values: values["model"] = os.path.expanduser(values["model"])
-        for key in ("tokenizer_path", "calibration_profile"):
+        for key in ("tokenizer_path", "calibration_profile", "projector_path"):
             if values.get(key): values[key] = os.path.expanduser(values[key])
         result = cls(**values)
         return result

@@ -1,7 +1,31 @@
 """HTTP contracts for direct scores and typed SystemOne questions."""
 from __future__ import annotations
 from typing import Annotated, Any, Literal
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+import base64
+import binascii
+import re
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+IMAGE_URL = re.compile(r"^data:image/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$")
+
+
+def validate_images(value: list[str]) -> list[str]:
+    if len(value) > 4:
+        raise ValueError("at most four images are supported")
+    total = 0
+    for item in value:
+        match = IMAGE_URL.fullmatch(item)
+        if not match:
+            raise ValueError("images must be PNG, JPEG or WebP data URLs")
+        if len(item) > 12_000_000:
+            raise ValueError("each image must be at most 8 MiB")
+        try:
+            total += len(base64.b64decode(match.group(2), validate=True))
+        except (ValueError, binascii.Error) as exc:
+            raise ValueError("invalid image base64") from exc
+    if total > 20_000_000:
+        raise ValueError("images exceed the 20 MB request limit")
+    return value
 
 class OptionIn(BaseModel):
     id: str = Field(min_length=1)
@@ -9,10 +33,13 @@ class OptionIn(BaseModel):
 
 class ScoreRequest(BaseModel):
     state: str | dict | list
+    images: list[str] = Field(default_factory=list)
     question: str = Field(min_length=1)
     options: list[str | OptionIn] = Field(min_length=2, max_length=16)
     scorer: Literal["semif", "likelihood"] | None = None
     temperature: float | None = Field(default=None, gt=0)
+
+    _check_images = field_validator("images")(validate_images)
 
 class ChoiceQuestion(BaseModel):
     type: Literal["choice"]
@@ -39,10 +66,13 @@ Question = Annotated[ChoiceQuestion | ScoreQuestion | NoulQuestion, Field(discri
 
 class SystemOneRequest(BaseModel):
     state: str | dict | list
+    images: list[str] = Field(default_factory=list)
     questions: dict[str, Question] = Field(min_length=1)
     scorer: Literal["semif", "likelihood"] | None = None
     mode: Literal["direct", "shared"] = "direct"
     temperature: float | None = Field(default=None, gt=0)
+
+    _check_images = field_validator("images")(validate_images)
 
 class HealthResponse(BaseModel):
     model: str
@@ -53,6 +83,7 @@ class HealthResponse(BaseModel):
     status: Literal["ready", "loading"]
     model_revision: str | None = None
     default_temperature: float = 1.0
+    vision: bool = False
 
 class OptionScoreOut(BaseModel):
     option: str
@@ -164,8 +195,11 @@ class DecisionCase(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: str = Field(min_length=1)
     state: str | dict | list
+    images: list[str] = Field(default_factory=list)
     questions: list[CaseQuestion] = Field(min_length=1, max_length=16)
     provenance: dict[str, str] = Field(default_factory=dict)
+
+    _check_images = field_validator("images")(validate_images)
 
     @model_validator(mode="after")
     def validate_questions(self):

@@ -1,6 +1,6 @@
 # OpenJEV-SemIf
 
-A single-model decision service with two explicit scoring methods. **SemIf** selects final-position letter logits for listed options; **likelihood** computes the conditional log probability of each option's text. Neither method generates an answer. The Torch profile loads one Hugging Face model at startup; the OpenJev 27B GGUF profile uses one resident llama.cpp process behind the same API.
+A single-model decision service with two explicit scoring methods. **SemIf** selects final-position letter logits for listed options; **likelihood** computes the conditional log probability of each option's text. Neither method generates an answer. The Torch profile loads one Hugging Face model at startup; the GGUF profiles use one resident inference process behind the same API.
 
 ## Install
 
@@ -92,6 +92,33 @@ The 27B API and workbench are at `http://127.0.0.1:8002` and `/ui`. The launcher
 
 This profile supports `/score`, typed `choice`, `score`, and `noul` under `/v1/systemone`, and the existing HTTP client and UI. It supports **SemIf direct only**; likelihood and shared KV mode require separate correctness work for this GGUF runtime. Its `bench` and `eval` CLI commands remain Torch-only. The GGUF is text-only. Its weights are licensed **CC BY-NC 4.0** (attribution and noncommercial use); see [NOTICE](NOTICE.md) and the upstream [model card](https://huggingface.co/openjev/openjev-GGUF).
 
+### Winnow-12B Q8_0 with vision on RTX 3090
+
+The [Winnow model card](https://huggingface.co/EldanRing/Winnow-12B) distributes Q8_0 weights and a separate F16 vision projector under Apache 2.0. Put both outside this repository:
+
+```bash
+mkdir -p /mnt/ai/models/classifiers/Winnow-12B
+hf download EldanRing/Winnow-12B gguf/Winnow-12B-Q8_0.gguf gguf/mmproj-Winnow-12B.gguf \
+  --revision abb21621114b10690259a7517fa59b153675176e \
+  --local-dir /mnt/ai/models/classifiers/Winnow-12B
+```
+
+The launcher accepts files either directly in `/mnt/ai/models/classifiers/Winnow-12B` or under its `gguf/` directory. `WINNOW_MODEL` and `WINNOW_MMPROJ` override these defaults. Verify hashes against the [release manifest](https://huggingface.co/EldanRing/Winnow-12B/blob/main/release-manifest.json): Q8_0 `b710efc4…a50818ea`, projector `91f08697…a7a219e`.
+
+Build the pinned [Winnow inference server](https://github.com/EldanRing/winnow-inference) outside this repository, for RTX 3090 CUDA architecture 86. The reference checkout is expected at `~/ai/winnow-inference-reference`; set `WINNOW_RUNTIME_DIR` to another path if needed. This host uses CUDA 12.8 with a locally installed GCC 13 toolchain and a glibc compatibility header; see the [upstream build instructions](https://github.com/EldanRing/winnow-inference/blob/main/docs/INSTALL.md) for other systems. Then run:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 ./launch-winnow12b.sh
+```
+
+The API and UI are at `http://127.0.0.1:8002` and `/ui`. The launcher reads [config/serve-winnow12b.json](config/serve-winnow12b.json); `PORT`, `WINNOW_MODEL`, `WINNOW_MMPROJ`, `WINNOW_SERVER_BIN`, `WINNOW_SERVER_PORT`, and `WINNOW_CONTEXT` override defaults. The first profile uses an 8192-position context, Q8 KV, exclusive context scheduling, and one loaded model with projector. The native server evaluates typed questions and reuses a state prefix for `"mode":"shared"`; direct mode submits questions separately. It rejects context overflows without truncation.
+
+The config records the pinned Hugging Face repository revision as `model_revision` and the GGUF checksum as `tokenizer_revision`, since this GGUF embeds its tokenizer. Update both when replacing the model file.
+
+The UI accepts one uploaded PNG, JPEG, or WebP image up to 8 MiB. Choose or paste a `/score` or `/v1/systemone` question and answer options to classify the image. The API accepts `"images": ["data:image/png;base64,..."]` alongside `state`; case batches place `images` on each case. Image bytes remain local to the browser, API, and inference server. Vision decisions are SemIf option probabilities; they do not generate a free-form image description. Native Winnow decisions use its model-specific prompt and final-position candidate logits. Their `prompt_hash` covers the exact native prefix/suffix token IDs and image content hashes.
+
+See the [Winnow deployment guide](docs/winnow.md) for artifact hashes, native build details, API image format, and operating settings.
+
 ## API example
 
 ```bash
@@ -122,7 +149,7 @@ Ready-to-paste UI examples: [several cases](examples/ui-cases-demo.json), [typed
 
 ## Web UI
 
-The server also serves a built-in decision workbench at **`http://127.0.0.1:8000/ui`** (or `/`; the 27B profile uses port 8002). Its default **Wklej JSON** tab accepts a `cases` batch, one case, `/score` input or `/v1/systemone` input and draws the resulting decisions and probability bars. Manual single-decision and multi-question forms remain available. On Torch, choose SemIf or likelihood and direct or shared mode. On GGUF, the UI selects SemIf direct and reads the default temperature from `/health`. Results show option distributions, confidence, timings, token counts, prompt hashes, and model revision; JSON can be copied or downloaded.
+The server also serves a built-in decision workbench at **`http://127.0.0.1:8000/ui`** (or `/`; the GGUF profiles use port 8002). Its default **Wklej JSON** tab accepts a `cases` batch, one case, `/score` input or `/v1/systemone` input and draws the resulting decisions and probability bars. Manual single-decision and multi-question forms remain available. On Torch, choose SemIf or likelihood and direct or shared mode. OpenJev 27B uses SemIf direct; Winnow also supports shared mode and image upload. Results show option distributions, confidence, timings, token counts, prompt hashes, and model revision; JSON can be copied or downloaded.
 
 The UI uses local HTML/CSS/JavaScript assets in `src/openjev_semif/web/`. It is served by the same FastAPI process and does not load a second model, need Gradio, or require a frontend build. The API documentation remains available at `/docs`. If `OPENJEV_API_KEY` protects `/v1/systemone`, enter the key in the UI's authorization field for that browser tab; it is not saved by the page.
 
@@ -178,11 +205,13 @@ See [architecture](docs/architecture.md) and [roadmap](docs/roadmap.md). Future 
 - `runtime/`: shared token-prefix/KV branching.
 - `benchmarks/`: local comparison tooling.
 
-The Torch backend protocol has `forward`, `prefill`, `get_last_logits`, and `sequence_logprob`. The GGUF adapter asks a resident llama.cpp server for one-token log probabilities and maps them to the same typed response; it does not claim Torch KV reuse or likelihood support. Calibration profiles can be stored per model revision and workload using `CalibrationProfile`; set `CALIBRATION_PROFILE` to apply one. The service rejects profiles for another model revision or scorer. `fit_temperature` fits a labelled validation set, which should be disjoint from evaluation data.
+The Torch backend protocol has `forward`, `prefill`, `get_last_logits`, and `sequence_logprob`. The OpenJev GGUF adapter asks a resident llama.cpp server for one-token log probabilities; the Winnow adapter calls the native typed-decision endpoint and vision projector. Neither GGUF backend claims likelihood scoring. Calibration profiles can be stored per model revision and workload using `CalibrationProfile`; set `CALIBRATION_PROFILE` to apply one. The service rejects profiles for another model revision or scorer. `fit_temperature` fits a labelled validation set, which should be disjoint from evaluation data.
 
 ## Acknowledgements and licenses
 
 The service lifecycle, `/score` and `/v1/systemone` typed API, and likelihood scoring are conceptually adapted from [daseinlabs/open-jev](https://github.com/daseinlabs/open-jev). Final-position option logits, strict answer-token validation, direct/shared modes, prompt hashing, reproducibility metadata, and temperature scaling are conceptually adapted from [TheoLeeCJ/SemIf-OpenJev](https://github.com/TheoLeeCJ/SemIf-OpenJev). This implementation was written as a new package; source directories, tests, benchmark datasets, model weights and demo assets were not copied. Both upstream projects use MIT; their copyright notices are retained in [LICENSE](LICENSE) and [LICENSE-SemIf](LICENSE-SemIf). Model weights remain subject to their own license.
+
+The Winnow integration uses the public API of [EldanRing/winnow-inference](https://github.com/EldanRing/winnow-inference) (MIT); no native source is copied into this repository. The [Winnow-12B weights and projector](https://huggingface.co/EldanRing/Winnow-12B) are Apache 2.0 and stay outside Git. Retain the model repository's LICENSE and NOTICE when redistributing those artifacts.
 
 MLX, browser demos, training heads, chess/Doom examples, serial mode, and publication-specific evaluations were left out of the service scope. The initial shared mode uses safe independent KV branches; a batched branch path can follow after direct/shared numerical equivalence is established on the target model.
 
