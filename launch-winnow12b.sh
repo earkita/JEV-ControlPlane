@@ -8,6 +8,13 @@ projector_file="${WINNOW_MMPROJ:-/mnt/ai/models/classifiers/Winnow-12B/mmproj-Wi
 server_bin="${WINNOW_SERVER_BIN:-$runtime_dir/.build-gcc13/bin/winnow-server}"
 server_port="${WINNOW_SERVER_PORT:-8091}"
 context="${WINNOW_CONTEXT:-8192}"
+batch="${WINNOW_BATCH:-4096}"
+ubatch="${WINNOW_UBATCH:-4096}"
+
+if ! [[ "$batch" =~ ^[0-9]+$ && "$ubatch" =~ ^[0-9]+$ ]] || (( ubatch < 1 || ubatch > batch )); then
+  printf 'WINNOW_BATCH and WINNOW_UBATCH must be positive integers with UBATCH <= BATCH.\n' >&2
+  exit 1
+fi
 
 if [[ ! -f "$model_file" && -f "/mnt/ai/models/classifiers/Winnow-12B/gguf/Winnow-12B-Q8_0.gguf" ]]; then
   model_file="/mnt/ai/models/classifiers/Winnow-12B/gguf/Winnow-12B-Q8_0.gguf"
@@ -34,6 +41,7 @@ fi
 python3 "$runtime_dir/scripts/serve.py" \
   --model "$model_file" --mmproj "$projector_file" --server "$server_bin" \
   --context "$context" --decision-context "$context" \
+  --batch "$batch" --ubatch "$ubatch" \
   --cache q8_0 --decision-parallel 2 --chat-parallel 1 \
   --memory exclusive --host 127.0.0.1 --port "$server_port" &
 server_pid=$!

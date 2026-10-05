@@ -111,7 +111,7 @@ Build the pinned [Winnow inference server](https://github.com/EldanRing/winnow-i
 CUDA_VISIBLE_DEVICES=0 ./launch-winnow12b.sh
 ```
 
-The API and UI are at `http://127.0.0.1:8002` and `/ui`. The launcher reads [config/serve-winnow12b.json](config/serve-winnow12b.json); `PORT`, `WINNOW_MODEL`, `WINNOW_MMPROJ`, `WINNOW_SERVER_BIN`, `WINNOW_SERVER_PORT`, and `WINNOW_CONTEXT` override defaults. The first profile uses an 8192-position context, Q8 KV, exclusive context scheduling, and one loaded model with projector. The native server evaluates typed questions and reuses a state prefix for `"mode":"shared"`; direct mode submits questions separately. It rejects context overflows without truncation.
+The API and UI are at `http://127.0.0.1:8002` and `/ui`. The launcher reads [config/serve-winnow12b.json](config/serve-winnow12b.json); `PORT`, `WINNOW_MODEL`, `WINNOW_MMPROJ`, `WINNOW_SERVER_BIN`, `WINNOW_SERVER_PORT`, `WINNOW_CONTEXT`, `WINNOW_BATCH`, and `WINNOW_UBATCH` override defaults. The profile uses an 8192-position context, 4096 microbatch, Q8 KV, exclusive context scheduling, and one loaded model with projector. The native server evaluates typed questions and reuses a state prefix for `"mode":"shared"`; direct mode submits questions separately. It rejects context overflows without truncation.
 
 The config records the pinned Hugging Face repository revision as `model_revision` and the GGUF checksum as `tokenizer_revision`, since this GGUF embeds its tokenizer. Update both when replacing the model file.
 

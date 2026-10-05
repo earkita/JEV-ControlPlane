@@ -36,7 +36,7 @@ From this repository:
 ./launch-winnow12b.sh
 ```
 
-The launcher starts both processes and stops the native server when the API exits. It defaults to API port `8002`, native port `8091`, 8192 context positions, Q8 KV, and exclusive memory scheduling. `PORT`, `WINNOW_MODEL`, `WINNOW_MMPROJ`, `WINNOW_SERVER_BIN`, `WINNOW_SERVER_PORT`, and `WINNOW_CONTEXT` override defaults. Keep the native and API context sizes equal. The service is local to `127.0.0.1`.
+The launcher starts both processes and stops the native server when the API exits. It defaults to API port `8002`, native port `8091`, 8192 context positions, batch and microbatch sizes of 4096, Q8 KV, and exclusive memory scheduling. `PORT`, `WINNOW_MODEL`, `WINNOW_MMPROJ`, `WINNOW_SERVER_BIN`, `WINNOW_SERVER_PORT`, `WINNOW_CONTEXT`, `WINNOW_BATCH`, and `WINNOW_UBATCH` override defaults. Keep the native and API context sizes equal. The service is local to `127.0.0.1`. If an unusually large image still exceeds the microbatch, resize it or increase both batch settings after checking available VRAM.
 
 ## Image decisions
 
